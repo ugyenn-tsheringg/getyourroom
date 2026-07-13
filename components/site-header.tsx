@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -40,7 +41,8 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
-        <Link href="/" className="text-[15px] font-semibold tracking-tight">
+        <Link href="/" className="flex items-center gap-2 text-[16.5px] font-semibold tracking-tight">
+          <Image src="/logo.svg" alt="" width={35} height={35} priority />
           GetYourRoom
         </Link>
         <div className="flex items-center gap-1.5">
