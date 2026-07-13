@@ -77,7 +77,7 @@ A website for people in Bhutan to find rooms/flats to rent, and for room owners 
 - **Database:** Supabase (Postgres) — stores all room listing data
 - **Image storage:** Cloudinary — stores and serves uploaded room images (NOT Supabase Storage)
 - **Hosting:** Vercel
-- **Auth:** None yet. Posting a room is a public form, no login required. Do not build login/signup flows unless explicitly asked.
+- **Auth:** Supabase Auth (email or phone OTP) for vendors who want to post a room. Renters can browse without an account.
 
 ## Current scope (MVP)
 1. Browse page — list of room listings
@@ -87,7 +87,6 @@ A website for people in Bhutan to find rooms/flats to rent, and for room owners 
 5. Nothing else. No payments, no subscriptions, no messaging, no user accounts.
 
 ## Explicitly out of scope for now
-- Authentication / user accounts
 - Vendor subscription tiers or payments
 - Video uploads (images only)
 - Admin/moderation dashboard
@@ -104,5 +103,5 @@ A website for people in Bhutan to find rooms/flats to rent, and for room owners 
 - `contact_phone` (text)
 - `created_at`
 
-## Notes for future auth pass
-When auth is added later: replace `contact_name`/`contact_phone` free-text fields with a real `user_id` from Supabase Auth, and add row-level security so users can only edit their own listings. Don't build this now — just don't make choices now that would make it hard later (e.g., keep the rooms table schema simple and swappable).
+## Auth notes
+Vendor posts a room only after signing in (Supabase Auth). Store `user_id` on each room row and add row-level security so vendors can only edit/delete their own listings. Renters need no account to browse or view listings.
