@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Add01Icon } from "@hugeicons/core-free-icons";
+import { LocationPicker, type LatLng } from "@/components/location-picker";
 import { PhotoThumb, type PhotoStatus } from "@/components/photo-thumb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +60,11 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
   const [whatsapp, setWhatsapp] = useState(initial?.vendor_whatsapp ?? "");
   const [phone, setPhone] = useState(initial?.vendor_phone ?? "");
   const [expiry, setExpiry] = useState(initial?.expires_at ? "keep" : "none");
+  const [location, setLocation] = useState<LatLng | null>(
+    initial?.latitude != null && initial?.longitude != null
+      ? { lat: initial.latitude, lng: initial.longitude }
+      : null
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -194,6 +200,8 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
         vendor_whatsapp: whatsapp.trim() || null,
         vendor_phone: phone.trim() || null,
         expires_at: resolveExpiresAt(),
+        latitude: location?.lat ?? null,
+        longitude: location?.lng ?? null,
       };
 
       let roomId: string;
@@ -396,6 +404,14 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
             Optional — the listing disappears from browse results after this.
           </p>
         </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold">Location</h2>
+        <p className="text-xs text-muted-foreground">
+          Optional — pin where the room is so renters can see it on a map.
+        </p>
+        <LocationPicker value={location} onChange={setLocation} />
       </section>
 
       <section className="space-y-4">

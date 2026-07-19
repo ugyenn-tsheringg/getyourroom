@@ -15,6 +15,9 @@ export type Room = {
   user_id: string;
   status: "available" | "rented";
   expires_at: string | null;
+  view_count: number;
+  latitude: number | null;
+  longitude: number | null;
   created_at: string;
 };
 

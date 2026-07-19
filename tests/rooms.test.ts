@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { fetchRoom, fetchRooms } from "@/lib/rooms";
+import { fetchRoom, fetchRooms, fetchRoomsPage, PAGE_SIZE } from "@/lib/rooms";
 import { supabase } from "@/lib/supabase";
 
 const TEST_ROOM = {
@@ -110,6 +110,38 @@ describe("filtering rooms", () => {
   });
 });
 
+describe("pagination", () => {
+  it("splits unfiltered results into full pages with a correct total", async () => {
+    const all = await fetchRooms();
+    expect(all.length).toBeGreaterThan(20); // needs the mock listings seeded
+
+    const page1 = await fetchRoomsPage({}, 1);
+    expect(page1.total).toBe(all.length);
+    expect(page1.rooms.length).toBe(Math.min(PAGE_SIZE, all.length));
+
+    const page2 = await fetchRoomsPage({}, 2);
+    expect(page2.total).toBe(all.length);
+
+    // No overlap, and ordering matches the unpaginated list
+    const ids1 = page1.rooms.map((r) => r.id);
+    const ids2 = page2.rooms.map((r) => r.id);
+    expect(ids1.some((id) => ids2.includes(id))).toBe(false);
+    expect([...ids1, ...ids2]).toEqual(all.slice(0, ids1.length + ids2.length).map((r) => r.id));
+  });
+
+  it("bases page count on filtered results, not the total", async () => {
+    const filtered = await fetchRooms({ district: "Thimphu" });
+    const page1 = await fetchRoomsPage({ district: "Thimphu" }, 1);
+    expect(page1.total).toBe(filtered.length);
+    expect(page1.rooms.every((r) => r.district === "Thimphu")).toBe(true);
+  });
+
+  it("returns an empty page past the end", async () => {
+    const { rooms } = await fetchRoomsPage({ district: "Thimphu" }, 99);
+    expect(rooms).toEqual([]);
+  });
+});
+
 describe("viewing a room", () => {
   it("returns full details for an existing room", async () => {
     const [first] = await fetchRooms();
@@ -126,5 +158,16 @@ describe("viewing a room", () => {
 
   it("returns null for an unknown id", async () => {
     expect(await fetchRoom(randomUUID())).toBeNull();
+  });
+
+  it("increments the view count via the RPC, even anonymously", async () => {
+    const [first] = await fetchRooms();
+    const before = (await fetchRoom(first.id))!.view_count;
+
+    const { error } = await supabase.rpc("increment_room_view", { room: first.id });
+    expect(error).toBeNull();
+
+    const after = (await fetchRoom(first.id))!.view_count;
+    expect(after).toBe(before + 1);
   });
 });

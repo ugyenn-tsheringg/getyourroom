@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -22,8 +22,10 @@ import { ReportDialog } from "@/components/report-dialog";
 import { SaveButton } from "@/components/save-button";
 import { roomTypeLabel } from "@/lib/districts";
 import { fetchRoom } from "@/lib/rooms";
+import { supabase } from "@/lib/supabase";
 import { isRoomUnavailable, type Room } from "@/lib/types";
 import { useSaved } from "@/lib/use-saved";
+import { useSession } from "@/lib/use-session";
 import { cn } from "@/lib/utils";
 
 // Bhutan numbers are 8 digits; wa.me and tel: need the country code.
@@ -89,11 +91,20 @@ function Gallery({ images, title }: { images: string[]; title: string }) {
 
 export default function RoomPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const session = useSession();
   const [room, setRoom] = useState<Room | null | undefined>(undefined);
   const { savedIds, toggleSaved } = useSaved();
+  const counted = useRef(false);
 
   useEffect(() => {
     fetchRoom(id).then(setRoom);
+  }, [id]);
+
+  // Count the view once per visit (ref guards React strict-mode double effects)
+  useEffect(() => {
+    if (counted.current) return;
+    counted.current = true;
+    supabase.rpc("increment_room_view", { room: id }).then(() => {});
   }, [id]);
 
   if (room === undefined) {
@@ -190,8 +201,38 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
             </>
           )}
 
+          {room.latitude != null && room.longitude != null && (
+            <>
+              <Separator className="my-6" />
+              <h2 className="text-base font-semibold">Location</h2>
+              <div className="mt-3 overflow-hidden rounded-2xl border">
+                <iframe
+                  title="Room location"
+                  src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&q=${room.latitude},${room.longitude}&maptype=satellite&zoom=17`}
+                  className="aspect-video w-full"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  allowFullScreen
+                />
+              </div>
+              <a
+                href={`https://www.google.com/maps?q=${room.latitude},${room.longitude}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-3 rounded-full")}
+              >
+                Open in Google Maps
+              </a>
+            </>
+          )}
+
           <div className="mt-8 flex items-center justify-between gap-4">
-            <p className="text-xs text-muted-foreground">Posted {posted}</p>
+            <p className="text-xs text-muted-foreground">
+              Posted {posted}
+              {session?.user.id === room.user_id && (
+                <> · {room.view_count} {room.view_count === 1 ? "view" : "views"} (only you can see this)</>
+              )}
+            </p>
             <ReportDialog roomId={room.id} />
           </div>
         </div>

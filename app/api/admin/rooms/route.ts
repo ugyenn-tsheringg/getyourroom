@@ -14,6 +14,8 @@ const EDITABLE_FIELDS = [
   "vendor_phone",
   "expires_at",
   "status",
+  "latitude",
+  "longitude",
 ] as const;
 
 // Admin edit of any listing.

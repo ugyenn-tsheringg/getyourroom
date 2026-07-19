@@ -32,6 +32,7 @@ export function Filters() {
       if (value) params.set(key, value);
       else params.delete(key);
     }
+    params.delete("page"); // changing any filter starts back at page 1
     router.replace(params.size ? `/?${params}` : "/", { scroll: false });
   }
 

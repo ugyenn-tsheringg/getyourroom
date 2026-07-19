@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Filters } from "@/components/filters";
+import { Pagination } from "@/components/pagination";
 import { RoomCard } from "@/components/room-card";
+import { SaveSearchButton } from "@/components/save-search-button";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { fetchRooms } from "@/lib/rooms";
+import { fetchRoomsPage, PAGE_SIZE } from "@/lib/rooms";
 import type { Room } from "@/lib/types";
 import { useSaved } from "@/lib/use-saved";
 
@@ -26,16 +28,20 @@ export function Browse() {
     [searchParams]
   );
 
+  const page = Math.max(1, Number(searchParams.get("page")) || 1);
   const [rooms, setRooms] = useState<Room[] | null>(null);
+  const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setRooms(null);
     setError(null);
-    fetchRooms(filters)
+    fetchRoomsPage(filters, page)
       .then((data) => {
-        if (!cancelled) setRooms(data);
+        if (cancelled) return;
+        setRooms(data.rooms);
+        setTotal(data.total);
       })
       .catch((e: Error) => {
         if (!cancelled) setError(e.message);
@@ -43,17 +49,30 @@ export function Browse() {
     return () => {
       cancelled = true;
     };
-  }, [filters]);
+  }, [filters, page]);
+
+  function goToPage(next: number) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next <= 1) params.delete("page");
+    else params.set("page", String(next));
+    router.replace(params.size ? `/?${params}` : "/");
+  }
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-      <section className="py-10 sm:py-14">
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-          Find a room in Bhutan
+      <section className="py-14 text-center sm:py-20">
+        <p className="text-sm font-medium tracking-wide text-muted-foreground uppercase">
+          Rooms for rent across Bhutan
+        </p>
+        <h1 className="mx-auto mt-3 max-w-2xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+          Your next room is a few clicks away
         </h1>
-        <p className="mt-2 max-w-xl text-muted-foreground">
-          Rooms and flats for rent, posted directly by owners. Browse freely — no
-          account needed.
+        <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
+          Studios, 1BHKs, and family flats from Thimphu to Paro — posted
+          directly by owners with photos, prices, and direct contact. Browse freely,
+          no account needed.
         </p>
       </section>
 
@@ -93,9 +112,13 @@ export function Browse() {
           </div>
         ) : (
           <>
-            <p className="pb-4 text-sm text-muted-foreground">
-              {rooms.length} {rooms.length === 1 ? "room" : "rooms"} available
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-4">
+              <p className="text-sm text-muted-foreground">
+                {total} {total === 1 ? "room" : "rooms"} available
+                {totalPages > 1 && ` · page ${page} of ${totalPages}`}
+              </p>
+              <SaveSearchButton filters={filters} />
+            </div>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {rooms.map((room, i) => (
                 <RoomCard
@@ -107,6 +130,7 @@ export function Browse() {
                 />
               ))}
             </div>
+            <Pagination page={page} totalPages={totalPages} onPageChange={goToPage} />
           </>
         )}
       </section>

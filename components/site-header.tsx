@@ -63,6 +63,9 @@ export function SiteHeader() {
                   My listings
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => router.push("/saved")}>Saved</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push("/saved-searches")}>
+                  Saved searches
+                </DropdownMenuItem>
                 {isAdmin && (
                   <DropdownMenuItem onClick={() => router.push("/admin")}>Admin</DropdownMenuItem>
                 )}

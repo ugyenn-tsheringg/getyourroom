@@ -169,6 +169,20 @@ describe("reports", () => {
   });
 });
 
+describe("room location", () => {
+  it("stores and returns optional coordinates", async () => {
+    const room = await createRoom({ latitude: 27.4712, longitude: 89.6339 });
+    const fetched = await fetchRoom(room.id);
+    expect(fetched!.latitude).toBeCloseTo(27.4712);
+    expect(fetched!.longitude).toBeCloseTo(89.6339);
+
+    const bare = await createRoom();
+    expect((await fetchRoom(bare.id))!.latitude).toBeNull();
+
+    await vendor.from("rooms").delete().in("id", [room.id, bare.id]);
+  });
+});
+
 describe("profile contact defaults", () => {
   it("stores and returns the user's own contact defaults", async () => {
     const contact = {
@@ -204,6 +218,38 @@ describe("profile contact defaults", () => {
       .eq("id", vendorId)
       .single();
     expect(data!.contact_name).toBe("Vitest Vendor");
+  });
+});
+
+describe("saved searches", () => {
+  it("are private per user and deletable", async () => {
+    const { data: created, error } = await vendor
+      .from("saved_searches")
+      .insert({ user_id: vendorId, district: "Trongsa", room_type: "studio", price_max: 9000 })
+      .select()
+      .single();
+    expect(error).toBeNull();
+    expect(created!.last_notified_at).toBeTruthy();
+
+    const { data: mine } = await vendor.from("saved_searches").select("*").eq("id", created!.id);
+    expect(mine!.length).toBe(1);
+
+    // Invisible to other users and to anonymous clients
+    const { data: theirs } = await other.from("saved_searches").select("*").eq("id", created!.id);
+    expect(theirs).toEqual([]);
+    const { data: anonRows } = await supabase.from("saved_searches").select("*");
+    expect(anonRows).toEqual([]);
+
+    // Anonymous users can't create one
+    const { error: anonInsert } = await supabase
+      .from("saved_searches")
+      .insert({ user_id: vendorId, district: "Paro" });
+    expect(anonInsert).not.toBeNull();
+
+    const { error: delError } = await vendor.from("saved_searches").delete().eq("id", created!.id);
+    expect(delError).toBeNull();
+    const { data: after } = await vendor.from("saved_searches").select("*").eq("id", created!.id);
+    expect(after).toEqual([]);
   });
 });
 

@@ -9,11 +9,13 @@ export type RoomFilters = {
   maxPrice?: number;
 };
 
+export const PAGE_SIZE = 15;
+
 // Browse results exclude rented rooms and listings past their expiry date.
-export async function fetchRooms(filters: RoomFilters = {}): Promise<Room[]> {
+function browseQuery(filters: RoomFilters) {
   let query = supabase
     .from("rooms")
-    .select("*")
+    .select("*", { count: "exact" })
     .eq("status", "available")
     .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
     .order("created_at", { ascending: false });
@@ -24,9 +26,28 @@ export async function fetchRooms(filters: RoomFilters = {}): Promise<Room[]> {
   if (filters.minPrice !== undefined) query = query.gte("price", filters.minPrice);
   if (filters.maxPrice !== undefined) query = query.lte("price", filters.maxPrice);
 
-  const { data, error } = await query;
+  return query;
+}
+
+export async function fetchRooms(filters: RoomFilters = {}): Promise<Room[]> {
+  const { data, error } = await browseQuery(filters);
   if (error) throw error;
   return data as Room[];
+}
+
+// One page of browse results plus the total count of filtered matches.
+export async function fetchRoomsPage(
+  filters: RoomFilters = {},
+  page = 1
+): Promise<{ rooms: Room[]; total: number }> {
+  const from = (page - 1) * PAGE_SIZE;
+  const { data, count, error } = await browseQuery(filters).range(from, from + PAGE_SIZE - 1);
+  if (error) {
+    // Requesting past the last page makes PostgREST 416; treat it as empty
+    if (error.code === "PGRST103") return { rooms: [], total: 0 };
+    throw error;
+  }
+  return { rooms: data as Room[], total: count ?? 0 };
 }
 
 // A vendor's own listings, including rented and expired ones.

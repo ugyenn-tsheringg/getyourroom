@@ -15,7 +15,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { roomTypeLabel } from "@/lib/districts";
 import { supabase } from "@/lib/supabase";
 import { isRoomUnavailable, type Report, type Room } from "@/lib/types";
@@ -53,6 +55,7 @@ export default function AdminPage() {
   const [view, setView] = useState<"open" | "resolved">("open");
   const [deleting, setDeleting] = useState<ReportRow | null>(null);
   const [deletingRoom, setDeletingRoom] = useState<Room | null>(null);
+  const [idQuery, setIdQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -146,31 +149,45 @@ export default function AdminPage() {
   }
 
   const visible = reports.filter((r) => r.status === view);
+  const visibleListings = (listings ?? []).filter(
+    (room) => !idQuery.trim() || room.id.toLowerCase().includes(idQuery.trim().toLowerCase())
+  );
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Reports</h1>
+      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Admin</h1>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
-        Listings flagged by visitors. Dismiss a report or remove the listing.
+        Reports, listings, and feedback for GetYourRoom.
       </p>
-
-      <div className="mt-6 flex gap-1.5">
-        {(["open", "resolved"] as const).map((v) => (
-          <Button
-            key={v}
-            variant={view === v ? "secondary" : "ghost"}
-            size="sm"
-            className="rounded-full capitalize"
-            onClick={() => setView(v)}
-          >
-            {v}
-          </Button>
-        ))}
-      </div>
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-      <div className="mt-6 space-y-4">
+      <Tabs defaultValue="reports" className="mt-6">
+        <TabsList>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
+          <TabsTrigger value="listings">Listings</TabsTrigger>
+          <TabsTrigger value="feedback">Feedback</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="reports">
+          <p className="mt-4 text-sm leading-6 text-muted-foreground">
+            Listings flagged by visitors. Dismiss a report or remove the listing.
+          </p>
+          <div className="mt-4 flex gap-1.5">
+            {(["open", "resolved"] as const).map((v) => (
+              <Button
+                key={v}
+                variant={view === v ? "secondary" : "ghost"}
+                size="sm"
+                className="rounded-full capitalize"
+                onClick={() => setView(v)}
+              >
+                {v}
+              </Button>
+            ))}
+          </div>
+
+          <div className="mt-6 space-y-4">
         {visible.length === 0 ? (
           <p className="py-12 text-center text-sm text-muted-foreground">
             No {view} reports.
@@ -198,6 +215,9 @@ export default function AdminPage() {
                       </>
                     )}
                   </p>
+                  <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                    room id: {report.room_id}
+                  </p>
                 </div>
                 {report.status === "resolved" && <Badge variant="outline">Resolved</Badge>}
               </div>
@@ -219,19 +239,29 @@ export default function AdminPage() {
             </div>
           ))
         )}
-      </div>
+          </div>
+        </TabsContent>
 
-      <section className="mt-14">
-        <h2 className="text-xl font-semibold tracking-tight">Listings</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Every listing on the site, including rented and expired ones. You can edit or
-          remove any of them.
-        </p>
-        <div className="mt-6 space-y-3">
-          {listings === null ? (
-            <Skeleton className="h-20 rounded-3xl" />
-          ) : (
-            listings.map((room) => (
+        <TabsContent value="listings">
+          <p className="mt-4 text-sm leading-6 text-muted-foreground">
+            Every listing on the site, including rented and expired ones. You can edit
+            or remove any of them.
+          </p>
+          <Input
+            value={idQuery}
+            onChange={(e) => setIdQuery(e.target.value)}
+            placeholder="Search by listing id…"
+            className="mt-4 font-mono text-sm"
+          />
+          <div className="mt-4 space-y-3">
+            {listings === null ? (
+              <Skeleton className="h-20 rounded-3xl" />
+            ) : visibleListings.length === 0 ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                No listings match that id.
+              </p>
+            ) : (
+              visibleListings.map((room) => (
               <div
                 key={room.id}
                 className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-3xl px-5 py-4 ring-1 ring-foreground/8"
@@ -251,6 +281,7 @@ export default function AdminPage() {
                     {room.district} · Nu. {room.price.toLocaleString("en-IN")} / month · by{" "}
                     {room.vendor_name}
                   </p>
+                  <p className="mt-1 font-mono text-[11px] text-muted-foreground">{room.id}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Link
@@ -271,16 +302,15 @@ export default function AdminPage() {
               </div>
             ))
           )}
-        </div>
-      </section>
+          </div>
+        </TabsContent>
 
-      <section className="mt-14">
-        <h2 className="text-xl font-semibold tracking-tight">Feedback</h2>
+        <TabsContent value="feedback">
         {feedback === null ? (
           <Skeleton className="mt-4 h-16 rounded-3xl" />
         ) : (
           <>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="mt-4 text-sm text-muted-foreground">
               {feedback.summary.count === 0 ? (
                 "No ratings yet."
               ) : (
@@ -333,7 +363,8 @@ export default function AdminPage() {
             </div>
           </>
         )}
-      </section>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={deletingRoom !== null} onOpenChange={(open) => !open && setDeletingRoom(null)}>
         <DialogContent>
