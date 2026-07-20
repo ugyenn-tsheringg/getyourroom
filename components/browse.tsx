@@ -62,21 +62,25 @@ export function Browse() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-      <section className="py-14 text-center sm:py-20">
-        <p className="text-sm font-medium tracking-wide text-muted-foreground uppercase">
-          Rooms for rent across Bhutan
-        </p>
-        <h1 className="mx-auto mt-3 max-w-2xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-          Your next room is a few clicks away
-        </h1>
-        <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
-          Studios, 1BHKs, and family flats from Thimphu to Paro — posted
-          directly by owners with photos, prices, and direct contact. Browse freely,
-          no account needed.
-        </p>
+      <section className="relative mt-4 overflow-hidden rounded-3xl bg-primary bg-[radial-gradient(55%_65%_at_50%_100%,var(--muted)_0%,var(--primary)_100%)] text-center">
+        <div className="relative px-4 pt-8 pb-12 sm:pt-10 sm:pb-14">
+          <p className="text-sm font-medium tracking-wide text-white/80 uppercase">
+            Rooms for rent across Bhutan
+          </p>
+          <h1 className="mx-auto mt-2 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-white sm:text-5xl">
+            Your next room is a few clicks away
+          </h1>
+          <p className="mx-auto mt-3 max-w-xl text-base leading-7 text-white/85 sm:text-lg">
+            Studios, 1BHKs, and family flats from Thimphu to Paro — posted
+            directly by owners with photos, prices, and direct contact. Browse freely,
+            no account needed.
+          </p>
+        </div>
       </section>
 
-      <Filters />
+      <div className="relative z-10 mx-auto -mt-8 max-w-4xl rounded-3xl bg-background p-3 shadow-lg ring-1 ring-black/5">
+        <Filters />
+      </div>
 
       <section className="py-8 pb-16">
         {error ? (
