@@ -63,6 +63,69 @@ async function createRoom(overrides: Record<string, unknown> = {}): Promise<Room
   return data as Room;
 }
 
+describe("room exchange", () => {
+  it("defaults new listings to rental", async () => {
+    const room = await createRoom();
+    expect(room.listing_type).toBe("rental");
+    expect(room.exchange_want_district).toBeNull();
+    expect(room.exchange_want_room_types).toEqual([]);
+    await vendor.from("rooms").delete().eq("id", room.id);
+  });
+
+  it("stores and returns the structured exchange fields", async () => {
+    const room = await createRoom({
+      listing_type: "exchange",
+      exchange_want_district: "Thimphu",
+      exchange_want_place: "Babesa",
+      exchange_want_room_types: ["1bhk", "2bhk"],
+      exchange_budget_min: 12000,
+      exchange_budget_max: 18000,
+    });
+    const fetched = await fetchRoom(room.id);
+    expect(fetched!.listing_type).toBe("exchange");
+    expect(fetched!.exchange_want_district).toBe("Thimphu");
+    expect(fetched!.exchange_want_place).toBe("Babesa");
+    expect(fetched!.exchange_want_room_types).toEqual(["1bhk", "2bhk"]);
+    expect(fetched!.exchange_budget_min).toBe(12000);
+    expect(fetched!.exchange_budget_max).toBe(18000);
+    // rent (price) is still present in exchange mode
+    expect(fetched!.price).toBe(BASE_ROOM.price);
+    await vendor.from("rooms").delete().eq("id", room.id);
+  });
+
+  it("rejects an invalid listing_type", async () => {
+    const { error } = await vendor
+      .from("rooms")
+      .insert({ ...BASE_ROOM, user_id: vendorId, listing_type: "swap" })
+      .select();
+    expect(error).not.toBeNull();
+  });
+
+  it("filters browse results by listing type, counting only the matched kind", async () => {
+    const rental = await createRoom({ listing_type: "rental", price: 4321 });
+    const exchange = await createRoom({
+      listing_type: "exchange",
+      price: 4321,
+      exchange_want_district: "Paro",
+    });
+
+    const exchangeOnly = await fetchRooms({ district: BASE_ROOM.district, listingType: "exchange" });
+    expect(exchangeOnly.some((r) => r.id === exchange.id)).toBe(true);
+    expect(exchangeOnly.some((r) => r.id === rental.id)).toBe(false);
+    expect(exchangeOnly.every((r) => r.listing_type === "exchange")).toBe(true);
+
+    const rentalsOnly = await fetchRooms({ district: BASE_ROOM.district, listingType: "rental" });
+    expect(rentalsOnly.some((r) => r.id === rental.id)).toBe(true);
+    expect(rentalsOnly.some((r) => r.id === exchange.id)).toBe(false);
+
+    const all = await fetchRooms({ district: BASE_ROOM.district });
+    expect(all.some((r) => r.id === rental.id)).toBe(true);
+    expect(all.some((r) => r.id === exchange.id)).toBe(true);
+
+    await vendor.from("rooms").delete().in("id", [rental.id, exchange.id]);
+  });
+});
+
 describe("rented rooms", () => {
   it("are hidden from browse but visible to the owner and by direct link", async () => {
     const room = await createRoom({ status: "rented" });

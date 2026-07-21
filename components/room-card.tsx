@@ -43,11 +43,18 @@ export function RoomCard({
               <HugeiconsIcon icon={Image02Icon} className="size-8 text-muted-foreground/40" />
             </div>
           )}
-          {unavailable && (
-            <span className="absolute top-2 left-2 rounded-full bg-foreground/70 px-2.5 py-1 text-xs font-medium text-background">
-              No longer available
-            </span>
-          )}
+          <div className="absolute top-2 left-2 flex flex-col items-start gap-1.5">
+            {room.listing_type === "exchange" && (
+              <span className="rounded-full bg-foreground px-2.5 py-1 text-[11px] font-bold tracking-wide text-background uppercase">
+                For exchange
+              </span>
+            )}
+            {unavailable && (
+              <span className="rounded-full bg-foreground/70 px-2.5 py-1 text-xs font-medium text-background">
+                No longer available
+              </span>
+            )}
+          </div>
           {onToggleSave && (
             <SaveButton
               saved={Boolean(saved)}

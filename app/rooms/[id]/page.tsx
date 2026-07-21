@@ -28,6 +28,13 @@ import { useSaved } from "@/lib/use-saved";
 import { useSession } from "@/lib/use-session";
 import { cn } from "@/lib/utils";
 
+function budgetRange(min: number | null, max: number | null): string {
+  const fmt = (n: number) => `Nu. ${n.toLocaleString("en-IN")}`;
+  if (min != null && max != null) return `${fmt(min)} – ${fmt(max)} / month`;
+  if (max != null) return `up to ${fmt(max)} / month`;
+  return `from ${fmt(min!)} / month`;
+}
+
 // Bhutan numbers are 8 digits; wa.me and tel: need the country code.
 function withCountryCode(phone: string) {
   const digits = phone.replace(/\D/g, "");
@@ -132,6 +139,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   }
 
   const title = `${roomTypeLabel(room.room_type)} in ${room.place}`;
+  const isExchange = room.listing_type === "exchange";
   const amenities = (room.amenities ?? "")
     .split(",")
     .map((a) => a.trim())
@@ -168,14 +176,52 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
 
       <div className="mt-8 grid items-start gap-10 lg:grid-cols-[1fr_360px]">
         <div>
+          {isExchange && (
+            <span className="mb-3 inline-block rounded-full bg-foreground px-3 py-1 text-[11px] font-bold tracking-wide text-background uppercase">
+              For exchange
+            </span>
+          )}
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
           <p className="mt-1 text-muted-foreground">
             {room.place}, {room.district}
           </p>
           <p className="mt-4 text-xl font-semibold">
             Nu. {room.price.toLocaleString("en-IN")}{" "}
-            <span className="text-base font-normal text-muted-foreground">/ month</span>
+            <span className="text-base font-normal text-muted-foreground">
+              / month{isExchange && " · Current Rent"}
+            </span>
           </p>
+
+          {isExchange && (
+            <>
+              <Separator className="my-6" />
+              <h2 className="text-base font-semibold">Looking for in return</h2>
+              <div className="mt-3 flex flex-wrap gap-x-8 gap-y-4 text-[15px] leading-7 text-foreground/80">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Wants a room in</p>
+                  <p className="mt-1">
+                    {room.exchange_want_place
+                      ? `${room.exchange_want_place}, ${room.exchange_want_district}`
+                      : room.exchange_want_district}
+                  </p>
+                </div>
+                {room.exchange_want_room_types.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Room type</p>
+                    <p className="mt-1">
+                      {room.exchange_want_room_types.map((t) => roomTypeLabel(t)).join(", ")}
+                    </p>
+                  </div>
+                )}
+                {(room.exchange_budget_min != null || room.exchange_budget_max != null) && (
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Budget for the new room</p>
+                    <p className="mt-1">{budgetRange(room.exchange_budget_min, room.exchange_budget_max)}</p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           {room.description && (
             <>

@@ -20,6 +20,7 @@ export function Filters() {
   const district = searchParams.get("district");
   const place = searchParams.get("place");
   const roomType = searchParams.get("type");
+  const kind = searchParams.get("kind");
 
   const [min, setMin] = useState(searchParams.get("min") ?? "");
   const [max, setMax] = useState(searchParams.get("max") ?? "");
@@ -55,7 +56,7 @@ export function Filters() {
     }
   }, [searchParams]);
 
-  const hasFilters = Boolean(district || place || roomType || min || max);
+  const hasFilters = Boolean(district || place || roomType || kind || min || max);
 
   const districtItems = [
     { value: null, label: "All districts" },
@@ -69,9 +70,14 @@ export function Filters() {
     { value: null, label: "Any type" },
     ...ROOM_TYPES.map((t) => ({ value: t.value as string, label: t.label })),
   ];
+  const kindItems = [
+    { value: null, label: "All listings" },
+    { value: "exchange", label: "Exchange only" },
+    { value: "rental", label: "Rentals only" },
+  ];
 
   return (
-    <div className="grid grid-cols-2 items-center gap-2 lg:flex lg:flex-wrap">
+    <div className="grid grid-cols-2 items-center gap-2 lg:flex lg:flex-wrap lg:justify-around">
       <Select
         items={districtItems}
         value={district}
@@ -117,6 +123,23 @@ export function Filters() {
         </SelectTrigger>
         <SelectContent>
           {typeItems.map((item) => (
+            <SelectItem key={item.label} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select
+        items={kindItems}
+        value={kind}
+        onValueChange={(value) => setParams({ kind: value })}
+      >
+        <SelectTrigger className="w-full lg:w-40">
+          <SelectValue placeholder="All listings" />
+        </SelectTrigger>
+        <SelectContent>
+          {kindItems.map((item) => (
             <SelectItem key={item.label} value={item.value}>
               {item.label}
             </SelectItem>

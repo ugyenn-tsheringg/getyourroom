@@ -8,7 +8,7 @@ import { RoomCard } from "@/components/room-card";
 import { SaveSearchButton } from "@/components/save-search-button";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { fetchRoomsPage, PAGE_SIZE } from "@/lib/rooms";
+import { fetchRoomsPage, PAGE_SIZE, type RoomFilters } from "@/lib/rooms";
 import type { Room } from "@/lib/types";
 import { useSaved } from "@/lib/use-saved";
 
@@ -17,16 +17,17 @@ export function Browse() {
   const searchParams = useSearchParams();
   const { savedIds, toggleSaved } = useSaved();
 
-  const filters = useMemo(
-    () => ({
+  const filters = useMemo((): RoomFilters => {
+    const kind = searchParams.get("kind");
+    return {
       district: searchParams.get("district") ?? undefined,
       place: searchParams.get("place") ?? undefined,
       roomType: searchParams.get("type") ?? undefined,
       minPrice: searchParams.get("min") ? Number(searchParams.get("min")) : undefined,
       maxPrice: searchParams.get("max") ? Number(searchParams.get("max")) : undefined,
-    }),
-    [searchParams]
-  );
+      listingType: kind === "exchange" || kind === "rental" ? kind : undefined,
+    };
+  }, [searchParams]);
 
   const page = Math.max(1, Number(searchParams.get("page")) || 1);
   const [rooms, setRooms] = useState<Room[] | null>(null);
@@ -78,7 +79,7 @@ export function Browse() {
         </div>
       </section>
 
-      <div className="relative z-10 mx-auto -mt-8 max-w-4xl rounded-3xl bg-background p-3 shadow-lg ring-1 ring-black/5">
+      <div className="relative z-10 mx-auto -mt-8 w-[93%] rounded-3xl bg-background p-3 shadow-lg ring-1 ring-black/5">
         <Filters />
       </div>
 

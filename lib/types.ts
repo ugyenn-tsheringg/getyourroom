@@ -1,5 +1,7 @@
 export type RoomType = "studio" | "1bhk" | "2bhk";
 
+export type ListingType = "rental" | "exchange";
+
 export type Room = {
   id: string;
   district: string;
@@ -18,6 +20,12 @@ export type Room = {
   view_count: number;
   latitude: number | null;
   longitude: number | null;
+  listing_type: ListingType;
+  exchange_want_district: string | null;
+  exchange_want_place: string | null;
+  exchange_want_room_types: RoomType[];
+  exchange_budget_min: number | null;
+  exchange_budget_max: number | null;
   created_at: string;
 };
 

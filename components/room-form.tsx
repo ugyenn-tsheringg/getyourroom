@@ -17,10 +17,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { DISTRICTS, DISTRICTS_AND_PLACES, ROOM_TYPES } from "@/lib/districts";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/use-session";
-import type { Room } from "@/lib/types";
+import type { ListingType, Room } from "@/lib/types";
 
 const EXPIRY_DAYS = [30, 60, 90];
 
@@ -60,6 +61,16 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
   const [whatsapp, setWhatsapp] = useState(initial?.vendor_whatsapp ?? "");
   const [phone, setPhone] = useState(initial?.vendor_phone ?? "");
   const [expiry, setExpiry] = useState(initial?.expires_at ? "keep" : "none");
+  const [listingType, setListingType] = useState<ListingType>(initial?.listing_type ?? "rental");
+  const [wantDistrict, setWantDistrict] = useState<string | null>(initial?.exchange_want_district ?? null);
+  const [wantPlace, setWantPlace] = useState<string | null>(initial?.exchange_want_place ?? null);
+  const [wantRoomTypes, setWantRoomTypes] = useState<string[]>(initial?.exchange_want_room_types ?? []);
+  const [budgetMin, setBudgetMin] = useState(
+    initial?.exchange_budget_min != null ? String(initial.exchange_budget_min) : ""
+  );
+  const [budgetMax, setBudgetMax] = useState(
+    initial?.exchange_budget_max != null ? String(initial.exchange_budget_max) : ""
+  );
   const [location, setLocation] = useState<LatLng | null>(
     initial?.latitude != null && initial?.longitude != null
       ? { lat: initial.latitude, lng: initial.longitude }
@@ -174,6 +185,10 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
       setError("Please fill in the room type, district, area, rent, and your name.");
       return;
     }
+    if (listingType === "exchange" && !wantDistrict) {
+      setError("Choose the district you're looking to move to in the exchange.");
+      return;
+    }
     if (!whatsapp.trim() && !phone.trim()) {
       setError("Add at least one way to contact you — WhatsApp or phone.");
       return;
@@ -202,6 +217,14 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
         expires_at: resolveExpiresAt(),
         latitude: location?.lat ?? null,
         longitude: location?.lng ?? null,
+        listing_type: listingType,
+        exchange_want_district: listingType === "exchange" ? wantDistrict : null,
+        exchange_want_place: listingType === "exchange" ? wantPlace : null,
+        exchange_want_room_types: listingType === "exchange" ? wantRoomTypes : [],
+        exchange_budget_min:
+          listingType === "exchange" && budgetMin ? Number(budgetMin) : null,
+        exchange_budget_max:
+          listingType === "exchange" && budgetMax ? Number(budgetMax) : null,
       };
 
       let roomId: string;
@@ -257,196 +280,400 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
   }));
   const typeItems = ROOM_TYPES.map((t) => ({ value: t.value as string, label: t.label }));
 
-  return (
-    <form onSubmit={handleSubmit} className="mt-8 space-y-10">
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold">Photos</h2>
-        <p className="text-xs text-muted-foreground">
-          Optional, but listings with photos get far more interest. Each photo is
-          checked automatically right after you add it.
-        </p>
-        {photoError && <p className="text-sm text-destructive">{photoError}</p>}
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-          {photos.map((photo, i) => (
-            <PhotoThumb
-              key={photo.key}
-              src={photo.preview}
-              status={photo.status}
-              label={`Photo ${i + 1}`}
-              onRemove={() => removePhoto(photo.key)}
-            />
-          ))}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex aspect-square flex-col items-center justify-center gap-1 rounded-2xl border border-dashed text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
-          >
-            <HugeiconsIcon icon={Add01Icon} className="size-4" />
-            Add
-          </button>
-        </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          hidden
-          onChange={(e) => {
-            addFiles(e.target.files);
-            e.target.value = "";
-          }}
-        />
-      </section>
+  const isExchange = listingType === "exchange";
+  const wantPlaceItems = (wantDistrict ? DISTRICTS_AND_PLACES[wantDistrict] ?? [] : []).map(
+    (p) => ({ value: p, label: p })
+  );
 
-      <section className="space-y-4">
-        <h2 className="text-sm font-semibold">Room details</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Room type</Label>
-            <Select items={typeItems} value={roomType} onValueChange={setRoomType}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                {typeItems.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="price">Rent (Nu. / month)</Label>
-            <Input
-              id="price"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              placeholder="e.g. 12000"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>District</Label>
-            <Select
-              items={districtItems}
-              value={district}
-              onValueChange={(value) => {
-                setDistrict(value);
-                setPlace(null);
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select district" />
-              </SelectTrigger>
-              <SelectContent>
-                {districtItems.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Area</Label>
-            <Select items={placeItems} value={place} onValueChange={setPlace} disabled={!district}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select area" />
-              </SelectTrigger>
-              <SelectContent>
-                {placeItems.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="description">Description</Label>
-          <Textarea
-            id="description"
-            rows={5}
-            placeholder="Floor, sunlight, water supply, nearby landmarks…"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
+  const photosField = (
+    <>
+      {photoError && <p className="text-sm text-destructive">{photoError}</p>}
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+        {photos.map((photo, i) => (
+          <PhotoThumb
+            key={photo.key}
+            src={photo.preview}
+            status={photo.status}
+            label={`Photo ${i + 1}`}
+            onRemove={() => removePhoto(photo.key)}
           />
-        </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="flex aspect-square flex-col items-center justify-center gap-1 rounded-2xl border border-dashed text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+        >
+          <HugeiconsIcon icon={Add01Icon} className="size-4" />
+          Add
+        </button>
+      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        hidden
+        onChange={(e) => {
+          addFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
+    </>
+  );
+
+  const roomDetailsFields = (
+    <>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="amenities">Amenities</Label>
-          <Input
-            id="amenities"
-            placeholder="e.g. Wi-Fi, Parking, 24/7 Water"
-            value={amenities}
-            onChange={(e) => setAmenities(e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">Separate with commas.</p>
-        </div>
-        <div className="space-y-2">
-          <Label>Listing expiry</Label>
-          <Select items={expiryItems} value={expiry} onValueChange={(v) => setExpiry(v as string)}>
-            <SelectTrigger className="w-full sm:w-64">
-              <SelectValue />
+          <Label>Room type</Label>
+          <Select items={typeItems} value={roomType} onValueChange={setRoomType}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select type" />
             </SelectTrigger>
             <SelectContent>
-              {expiryItems.map((item) => (
+              {typeItems.map((item) => (
                 <SelectItem key={item.value} value={item.value}>
                   {item.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <p className="text-xs text-muted-foreground">
-            Optional — the listing disappears from browse results after this.
-          </p>
         </div>
+        <div className="space-y-2">
+          <Label htmlFor="price">
+            {isExchange ? "Current rent (Nu. / month)" : "Rent (Nu. / month)"}
+          </Label>
+          <Input
+            id="price"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            placeholder="e.g. 12000"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+          />
+          {isExchange && (
+            <p className="text-xs text-muted-foreground">
+              What you pay now — helps the other person judge a fair trade.
+            </p>
+          )}
+        </div>
+        <div className="space-y-2">
+          <Label>District</Label>
+          <Select
+            items={districtItems}
+            value={district}
+            onValueChange={(value) => {
+              setDistrict(value);
+              setPlace(null);
+            }}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select district" />
+            </SelectTrigger>
+            <SelectContent>
+              {districtItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Area</Label>
+          <Select items={placeItems} value={place} onValueChange={setPlace} disabled={!district}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select area" />
+            </SelectTrigger>
+            <SelectContent>
+              {placeItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="description">Description</Label>
+        <Textarea
+          id="description"
+          rows={5}
+          placeholder="Floor, sunlight, water supply, nearby landmarks…"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="amenities">Amenities</Label>
+        <Input
+          id="amenities"
+          placeholder="e.g. Wi-Fi, Parking, 24/7 Water"
+          value={amenities}
+          onChange={(e) => setAmenities(e.target.value)}
+        />
+        <p className="text-xs text-muted-foreground">Separate with commas.</p>
+      </div>
+      <div className="space-y-2">
+        <Label>Listing expiry</Label>
+        <Select items={expiryItems} value={expiry} onValueChange={(v) => setExpiry(v as string)}>
+          <SelectTrigger className="w-full sm:w-64">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {expiryItems.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Optional — the listing disappears from browse results after this.
+        </p>
+      </div>
+    </>
+  );
+
+  const contactFields = (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor="vendor-name">Your name</Label>
+        <Input
+          id="vendor-name"
+          placeholder="e.g. Tashi Dorji"
+          value={vendorName}
+          onChange={(e) => setVendorName(e.target.value)}
+        />
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="whatsapp">WhatsApp</Label>
+          <Input
+            id="whatsapp"
+            inputMode="tel"
+            placeholder="e.g. 17123456"
+            value={whatsapp}
+            onChange={(e) => setWhatsapp(e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="phone">Phone</Label>
+          <Input
+            id="phone"
+            inputMode="tel"
+            placeholder="e.g. 17123456"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+        </div>
+      </div>
+    </>
+  );
+
+  const lookingForFields = (
+    <>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label>District</Label>
+          <Select
+            items={districtItems}
+            value={wantDistrict}
+            onValueChange={(value) => {
+              setWantDistrict(value);
+              setWantPlace(null);
+            }}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select district" />
+            </SelectTrigger>
+            <SelectContent>
+              {districtItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">Required — where you want to move.</p>
+        </div>
+        <div className="space-y-2">
+          <Label>Area</Label>
+          <Select
+            items={wantPlaceItems}
+            value={wantPlace}
+            onValueChange={setWantPlace}
+            disabled={!wantDistrict}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Any area" />
+            </SelectTrigger>
+            <SelectContent>
+              {wantPlaceItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">Optional.</p>
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label>Room type</Label>
+        <ToggleGroup
+          multiple
+          value={wantRoomTypes}
+          onValueChange={(value) => setWantRoomTypes(value)}
+          variant="outline"
+          className="flex-wrap"
+        >
+          {typeItems.map((item) => (
+            <ToggleGroupItem
+              key={item.value}
+              value={item.value}
+              className="h-9 rounded-full px-4 text-sm aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary"
+            >
+              {item.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        <p className="text-xs text-muted-foreground">
+          Optional — pick any that work, or leave blank for any type.
+        </p>
+      </div>
+      <div className="space-y-2">
+        <Label>Budget for the new room (Nu. / month)</Label>
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            placeholder="Min"
+            value={budgetMin}
+            onChange={(e) => setBudgetMin(e.target.value)}
+            className="w-full sm:w-32"
+          />
+          <span className="text-muted-foreground">–</span>
+          <Input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            placeholder="Max"
+            value={budgetMax}
+            onChange={(e) => setBudgetMax(e.target.value)}
+            className="w-full sm:w-32"
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Optional — what you&apos;re willing to pay if the new room costs more.
+        </p>
+      </div>
+    </>
+  );
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-8 space-y-10">
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold">What are you posting?</h2>
+        <ToggleGroup
+          value={[listingType]}
+          onValueChange={(value) => {
+            const next = value[value.length - 1] as ListingType | undefined;
+            if (next) setListingType(next);
+          }}
+          variant="outline"
+          spacing={0}
+          className="w-full"
+        >
+          <ToggleGroupItem
+            value="rental"
+            className="h-11 flex-1 text-sm aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary"
+          >
+            Renting out a room
+          </ToggleGroupItem>
+          <ToggleGroupItem
+            value="exchange"
+            className="h-11 flex-1 text-sm aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary"
+          >
+            Looking to exchange
+          </ToggleGroupItem>
+        </ToggleGroup>
+        <p className="text-xs text-muted-foreground">
+          {isExchange
+            ? "Describe the room you have now and the kind of room you'd want in return."
+            : "Post a room you want to rent out to someone."}
+        </p>
       </section>
 
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold">Location</h2>
-        <p className="text-xs text-muted-foreground">
-          Optional — pin where the room is so renters can see it on a map.
-        </p>
-        <LocationPicker value={location} onChange={setLocation} />
-      </section>
+      {isExchange ? (
+        <>
+          <section className="space-y-6">
+            <div className="space-y-1">
+              <h2 className="text-base font-semibold">What you have now</h2>
+              <p className="text-xs text-muted-foreground">
+                The room you&apos;re offering, and where it is.
+              </p>
+            </div>
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium">Photos</h3>
+              <p className="text-xs text-muted-foreground">
+                Optional, but listings with photos get far more interest. Each photo is
+                checked automatically right after you add it.
+              </p>
+              {photosField}
+            </div>
+            <div className="space-y-4">{roomDetailsFields}</div>
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium">Where your current room is</h3>
+              <p className="text-xs text-muted-foreground">
+                Optional — pin it so people can see the location on a map.
+              </p>
+              <LocationPicker value={location} onChange={setLocation} />
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <div className="space-y-1">
+              <h2 className="text-base font-semibold">What you&apos;re looking for</h2>
+              <p className="text-xs text-muted-foreground">
+                The kind of room you&apos;d want in return.
+              </p>
+            </div>
+            {lookingForFields}
+          </section>
+        </>
+      ) : (
+        <>
+          <section className="space-y-3">
+            <h2 className="text-sm font-semibold">Photos</h2>
+            <p className="text-xs text-muted-foreground">
+              Optional, but listings with photos get far more interest. Each photo is
+              checked automatically right after you add it.
+            </p>
+            {photosField}
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-sm font-semibold">Room details</h2>
+            {roomDetailsFields}
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-sm font-semibold">Location</h2>
+            <p className="text-xs text-muted-foreground">
+              Optional — pin where the room is so renters can see it on a map.
+            </p>
+            <LocationPicker value={location} onChange={setLocation} />
+          </section>
+        </>
+      )}
 
       <section className="space-y-4">
         <h2 className="text-sm font-semibold">Contact</h2>
-        <div className="space-y-2">
-          <Label htmlFor="vendor-name">Your name</Label>
-          <Input
-            id="vendor-name"
-            placeholder="e.g. Tashi Dorji"
-            value={vendorName}
-            onChange={(e) => setVendorName(e.target.value)}
-          />
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="whatsapp">WhatsApp</Label>
-            <Input
-              id="whatsapp"
-              inputMode="tel"
-              placeholder="e.g. 17123456"
-              value={whatsapp}
-              onChange={(e) => setWhatsapp(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone">Phone</Label>
-            <Input
-              id="phone"
-              inputMode="tel"
-              placeholder="e.g. 17123456"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
-          </div>
-        </div>
+        {contactFields}
       </section>
 
       {error && <p className="text-sm text-destructive">{error}</p>}

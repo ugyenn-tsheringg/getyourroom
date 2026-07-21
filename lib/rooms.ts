@@ -7,6 +7,7 @@ export type RoomFilters = {
   roomType?: string;
   minPrice?: number;
   maxPrice?: number;
+  listingType?: "rental" | "exchange";
 };
 
 export const PAGE_SIZE = 15;
@@ -23,6 +24,7 @@ function browseQuery(filters: RoomFilters) {
   if (filters.district) query = query.eq("district", filters.district);
   if (filters.place) query = query.eq("place", filters.place);
   if (filters.roomType) query = query.eq("room_type", filters.roomType);
+  if (filters.listingType) query = query.eq("listing_type", filters.listingType);
   if (filters.minPrice !== undefined) query = query.gte("price", filters.minPrice);
   if (filters.maxPrice !== undefined) query = query.lte("price", filters.maxPrice);
 

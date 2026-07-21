@@ -16,6 +16,12 @@ const EDITABLE_FIELDS = [
   "status",
   "latitude",
   "longitude",
+  "listing_type",
+  "exchange_want_district",
+  "exchange_want_place",
+  "exchange_want_room_types",
+  "exchange_budget_min",
+  "exchange_budget_max",
 ] as const;
 
 // Admin edit of any listing.
