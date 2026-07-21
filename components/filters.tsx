@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Combobox } from "@/components/combobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -59,11 +60,11 @@ export function Filters() {
   const hasFilters = Boolean(district || place || roomType || kind || min || max);
 
   const districtItems = [
-    { value: null, label: "All districts" },
+    { value: "", label: "All districts" },
     ...DISTRICTS.map((d) => ({ value: d, label: d })),
   ];
   const placeItems = [
-    { value: null, label: "All areas" },
+    { value: "", label: "All areas" },
     ...(district ? DISTRICTS_AND_PLACES[district] ?? [] : []).map((p) => ({ value: p, label: p })),
   ];
   const typeItems = [
@@ -78,40 +79,24 @@ export function Filters() {
 
   return (
     <div className="grid grid-cols-2 items-center gap-2 lg:flex lg:flex-wrap lg:justify-around">
-      <Select
+      <Combobox
+        className="w-full lg:w-48"
+        placeholder="All districts"
+        searchPlaceholder="Search districts…"
         items={districtItems}
-        value={district}
-        onValueChange={(value) => setParams({ district: value, place: null })}
-      >
-        <SelectTrigger className="w-full lg:w-48">
-          <SelectValue placeholder="All districts" />
-        </SelectTrigger>
-        <SelectContent>
-          {districtItems.map((item) => (
-            <SelectItem key={item.label} value={item.value}>
-              {item.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        value={district ?? ""}
+        onChange={(value) => setParams({ district: value || null, place: null })}
+      />
 
-      <Select
+      <Combobox
+        className="w-full lg:w-48"
+        placeholder="All areas"
+        searchPlaceholder="Search areas…"
         items={placeItems}
-        value={place}
-        onValueChange={(value) => setParams({ place: value })}
+        value={place ?? ""}
+        onChange={(value) => setParams({ place: value || null })}
         disabled={!district}
-      >
-        <SelectTrigger className="w-full lg:w-48">
-          <SelectValue placeholder="All areas" />
-        </SelectTrigger>
-        <SelectContent>
-          {placeItems.map((item) => (
-            <SelectItem key={item.label} value={item.value}>
-              {item.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      />
 
       <Select
         items={typeItems}
@@ -135,7 +120,7 @@ export function Filters() {
         value={kind}
         onValueChange={(value) => setParams({ kind: value })}
       >
-        <SelectTrigger className="w-full lg:w-40">
+        <SelectTrigger className="w-full lg:w-35">
           <SelectValue placeholder="All listings" />
         </SelectTrigger>
         <SelectContent>
@@ -155,7 +140,7 @@ export function Filters() {
           placeholder="Min Nu."
           value={min}
           onChange={(e) => setMin(e.target.value)}
-          className="w-full lg:w-28"
+          className="w-full lg:w-25"
         />
         <span className="text-muted-foreground">–</span>
         <Input
@@ -165,7 +150,7 @@ export function Filters() {
           placeholder="Max Nu."
           value={max}
           onChange={(e) => setMax(e.target.value)}
-          className="w-full lg:w-28"
+          className="w-full lg:w-25"
         />
       </div>
 

@@ -1,4 +1,13 @@
-export type RoomType = "studio" | "1bhk" | "2bhk";
+export type RoomType =
+  | "studio"
+  | "1bhk"
+  | "2bhk"
+  | "3bhk"
+  | "4bhk"
+  | "shared"
+  | "house"
+  | "shophouse"
+  | "commercial";
 
 export type ListingType = "rental" | "exchange";
 

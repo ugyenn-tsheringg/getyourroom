@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Add01Icon } from "@hugeicons/core-free-icons";
+import { Combobox } from "@/components/combobox";
 import { LocationPicker, type LatLng } from "@/components/location-picker";
 import { PhotoThumb, type PhotoStatus } from "@/components/photo-thumb";
 import { Button } from "@/components/ui/button";
@@ -22,15 +23,35 @@ import { DISTRICTS, DISTRICTS_AND_PLACES, ROOM_TYPES } from "@/lib/districts";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/use-session";
 import type { ListingType, Room } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 const EXPIRY_DAYS = [30, 60, 90];
 
-type Photo = {
-  key: string;
-  preview: string;
-  status: PhotoStatus;
-  url?: string;
-};
+const PHOTO_SLOTS = [
+  { key: "bedroom", label: "Bedroom", required: true },
+  { key: "kitchen", label: "Kitchen", required: true },
+  { key: "bathroom", label: "Bathroom", required: true },
+  { key: "hall", label: "Hall", required: false },
+  { key: "extra", label: "One more photo", required: false },
+] as const;
+
+type SlotKey = (typeof PHOTO_SLOTS)[number]["key"];
+type SlotState = { status: "empty" | PhotoStatus; preview?: string; url?: string };
+
+// Fields checked on submit, in top-to-bottom visual order (used to scroll to
+// the first invalid one).
+const FIELD_ORDER = [
+  "bedroom",
+  "kitchen",
+  "bathroom",
+  "roomType",
+  "price",
+  "district",
+  "place",
+  "wantDistrict",
+  "vendorName",
+  "contact",
+] as const;
 
 // adminOverride: the admin editing someone else's listing — the update goes
 // through the admin API route since RLS only allows owners to update directly.
@@ -39,18 +60,33 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
   const session = useSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [photos, setPhotos] = useState<Photo[]>(
-    () =>
-      (initial?.images ?? []).map((url) => ({
-        key: url,
-        preview: url,
-        status: "existing" as const,
-        url,
-      }))
-  );
-  const [photoError, setPhotoError] = useState<string | null>(null);
-  const photosRef = useRef<Photo[]>([]);
-  photosRef.current = photos;
+  // Five fixed, labeled photo slots. Existing images (edit mode) map to the
+  // slots by position.
+  const [slots, setSlots] = useState<Record<SlotKey, SlotState>>(() => {
+    const init = {} as Record<SlotKey, SlotState>;
+    PHOTO_SLOTS.forEach((slot, i) => {
+      const url = initial?.images?.[i];
+      init[slot.key] = url ? { status: "existing", preview: url, url } : { status: "empty" };
+    });
+    return init;
+  });
+  const slotsRef = useRef(slots);
+  slotsRef.current = slots;
+  const pendingSlot = useRef<SlotKey | null>(null);
+
+  // Per-field validation messages, shown after a submit attempt.
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const fieldRefs = useRef<Record<string, HTMLElement | null>>({});
+  const registerField = (key: string) => (el: HTMLElement | null) => {
+    fieldRefs.current[key] = el;
+  };
+  const clearError = (key: string) =>
+    setErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
   const [roomType, setRoomType] = useState<string | null>(initial?.room_type ?? null);
   const [district, setDistrict] = useState<string | null>(initial?.district ?? null);
   const [place, setPlace] = useState<string | null>(initial?.place ?? null);
@@ -82,8 +118,8 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
   // Release preview object URLs when the form unmounts
   useEffect(() => {
     return () => {
-      photosRef.current.forEach((p) => {
-        if (p.preview.startsWith("blob:")) URL.revokeObjectURL(p.preview);
+      Object.values(slotsRef.current).forEach((s) => {
+        if (s.preview?.startsWith("blob:")) URL.revokeObjectURL(s.preview);
       });
     };
   }, []);
@@ -108,49 +144,44 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
   if (!session) return null;
 
   // Each photo is scanned (Sightengine) and uploaded to Cloudinary immediately
-  // on selection, so publishing doesn't have to wait for it.
-  function addFiles(list: FileList | null) {
-    if (!list || !session) return;
-    setPhotoError(null);
-    for (const file of Array.from(list)) {
-      const key = crypto.randomUUID();
-      const preview = URL.createObjectURL(file);
-      setPhotos((prev) => [...prev, { key, preview, status: "scanning" }]);
+  // on selection, so publishing doesn't have to wait for it. One photo per slot.
+  function uploadToSlot(key: SlotKey, file: File) {
+    if (!session) return;
+    clearError(key);
+    const preview = URL.createObjectURL(file);
+    setSlots((prev) => ({ ...prev, [key]: { status: "scanning", preview } }));
 
-      const body = new FormData();
-      body.append("file", file);
-      fetch("/api/upload", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${session.access_token}` },
-        body,
+    const body = new FormData();
+    body.append("file", file);
+    fetch("/api/upload", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${session.access_token}` },
+      body,
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const json = await res.json().catch(() => null);
+          throw new Error(json?.error ?? "Upload failed. Please try again.");
+        }
+        const { url } = await res.json();
+        setSlots((prev) => ({ ...prev, [key]: { status: "verified", preview, url } }));
       })
-        .then(async (res) => {
-          if (!res.ok) {
-            const json = await res.json().catch(() => null);
-            throw new Error(json?.error ?? "Upload failed. Please try again.");
-          }
-          const { url } = await res.json();
-          setPhotos((prev) =>
-            prev.map((p) => (p.key === key ? { ...p, status: "verified" as const, url } : p))
-          );
-        })
-        .catch((err: Error) => {
-          URL.revokeObjectURL(preview);
-          setPhotos((prev) => prev.filter((p) => p.key !== key));
-          setPhotoError(`"${file.name}": ${err.message}`);
-        });
-    }
+      .catch((err: Error) => {
+        URL.revokeObjectURL(preview);
+        setSlots((prev) => ({ ...prev, [key]: { status: "empty" } }));
+        setErrors((prev) => ({ ...prev, [key]: err.message }));
+      });
   }
 
-  function removePhoto(key: string) {
-    setPhotos((prev) => {
-      const photo = prev.find((p) => p.key === key);
-      if (photo?.preview.startsWith("blob:")) URL.revokeObjectURL(photo.preview);
-      return prev.filter((p) => p.key !== key);
+  function removeSlot(key: SlotKey) {
+    setSlots((prev) => {
+      const s = prev[key];
+      if (s.preview?.startsWith("blob:")) URL.revokeObjectURL(s.preview);
+      return { ...prev, [key]: { status: "empty" } };
     });
   }
 
-  const scanning = photos.some((p) => p.status === "scanning");
+  const scanning = PHOTO_SLOTS.some((s) => slots[s.key].status === "scanning");
 
   const expiryItems = [
     ...(initial?.expires_at
@@ -179,27 +210,37 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!session) return;
+    if (!session || scanning) return;
 
-    if (!roomType || !district || !place || !price || !vendorName.trim()) {
-      setError("Please fill in the room type, district, area, rent, and your name.");
-      return;
-    }
-    if (listingType === "exchange" && !wantDistrict) {
-      setError("Choose the district you're looking to move to in the exchange.");
-      return;
-    }
-    if (!whatsapp.trim() && !phone.trim()) {
-      setError("Add at least one way to contact you — WhatsApp or phone.");
-      return;
-    }
+    const found: Record<string, string> = {};
+    if (!slots.bedroom.url) found.bedroom = "A bedroom photo is required.";
+    if (!slots.kitchen.url) found.kitchen = "A kitchen photo is required.";
+    if (!slots.bathroom.url) found.bathroom = "A bathroom photo is required.";
+    if (!roomType) found.roomType = "Choose a room type.";
+    if (!price) found.price = "Enter the monthly rent.";
+    if (!district) found.district = "Choose a district.";
+    if (!place) found.place = "Choose an area.";
+    if (listingType === "exchange" && !wantDistrict)
+      found.wantDistrict = "Choose the district you want to move to.";
+    if (!vendorName.trim()) found.vendorName = "Enter your name.";
+    if (!whatsapp.trim() && !phone.trim())
+      found.contact = "Add at least one way to reach you — WhatsApp or phone.";
 
-    if (scanning) {
-      setError("Please wait for your photos to finish being checked.");
+    if (Object.keys(found).length > 0) {
+      setErrors(found);
+      const firstKey = FIELD_ORDER.find((k) => found[k]);
+      const el = firstKey ? fieldRefs.current[firstKey] : null;
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        window.setTimeout(() => {
+          el.querySelector<HTMLElement>("input, button, textarea")?.focus({ preventScroll: true });
+        }, 300);
+      }
       return;
     }
 
     setSubmitting(true);
+    setErrors({});
     setError(null);
 
     try {
@@ -210,7 +251,7 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
         price: Number(price),
         description: description.trim() || null,
         amenities: amenities.trim() || null,
-        images: photos.map((p) => p.url).filter((u): u is string => Boolean(u)),
+        images: PHOTO_SLOTS.map((s) => slots[s.key].url).filter((u): u is string => Boolean(u)),
         vendor_name: vendorName.trim(),
         vendor_whatsapp: whatsapp.trim() || null,
         vendor_phone: phone.trim() || null,
@@ -287,35 +328,60 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
 
   const photosField = (
     <>
-      {photoError && <p className="text-sm text-destructive">{photoError}</p>}
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-        {photos.map((photo, i) => (
-          <PhotoThumb
-            key={photo.key}
-            src={photo.preview}
-            status={photo.status}
-            label={`Photo ${i + 1}`}
-            onRemove={() => removePhoto(photo.key)}
-          />
-        ))}
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="flex aspect-square flex-col items-center justify-center gap-1 rounded-2xl border border-dashed text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
-        >
-          <HugeiconsIcon icon={Add01Icon} className="size-4" />
-          Add
-        </button>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {PHOTO_SLOTS.map((slot) => {
+          const s = slots[slot.key];
+          const err = errors[slot.key];
+          return (
+            <div key={slot.key} ref={registerField(slot.key)} className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium">
+                  {slot.label}
+                  {slot.required && <span className="text-destructive"> *</span>}
+                </span>
+                {!slot.required && (
+                  <span className="text-[11px] text-muted-foreground">Optional</span>
+                )}
+              </div>
+              {s.status !== "empty" ? (
+                <PhotoThumb
+                  src={s.preview ?? ""}
+                  status={s.status}
+                  label={slot.label}
+                  onRemove={() => removeSlot(slot.key)}
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    pendingSlot.current = slot.key;
+                    fileInputRef.current?.click();
+                  }}
+                  className={cn(
+                    "flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-2xl border border-dashed text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground",
+                    err && "border-destructive text-destructive hover:border-destructive"
+                  )}
+                >
+                  <HugeiconsIcon icon={Add01Icon} className="size-4" />
+                  Add
+                </button>
+              )}
+              {err && <p className="text-xs text-destructive">{err}</p>}
+            </div>
+          );
+        })}
       </div>
       <input
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        multiple
         hidden
         onChange={(e) => {
-          addFiles(e.target.files);
+          const file = e.target.files?.[0];
+          const key = pendingSlot.current;
+          if (file && key) uploadToSlot(key, file);
           e.target.value = "";
+          pendingSlot.current = null;
         }}
       />
     </>
@@ -324,10 +390,17 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
   const roomDetailsFields = (
     <>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
+        <div ref={registerField("roomType")} className="space-y-2">
           <Label>Room type</Label>
-          <Select items={typeItems} value={roomType} onValueChange={setRoomType}>
-            <SelectTrigger className="w-full">
+          <Select
+            items={typeItems}
+            value={roomType}
+            onValueChange={(v) => {
+              setRoomType(v);
+              clearError("roomType");
+            }}
+          >
+            <SelectTrigger className={cn("w-full", errors.roomType && "border-destructive")}>
               <SelectValue placeholder="Select type" />
             </SelectTrigger>
             <SelectContent>
@@ -338,8 +411,9 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
               ))}
             </SelectContent>
           </Select>
+          {errors.roomType && <p className="text-xs text-destructive">{errors.roomType}</p>}
         </div>
-        <div className="space-y-2">
+        <div ref={registerField("price")} className="space-y-2">
           <Label htmlFor="price">
             {isExchange ? "Current rent (Nu. / month)" : "Rent (Nu. / month)"}
           </Label>
@@ -350,50 +424,53 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
             min={1}
             placeholder="e.g. 12000"
             value={price}
-            onChange={(e) => setPrice(e.target.value)}
+            aria-invalid={!!errors.price}
+            onChange={(e) => {
+              setPrice(e.target.value);
+              clearError("price");
+            }}
           />
-          {isExchange && (
-            <p className="text-xs text-muted-foreground">
-              What you pay now — helps the other person judge a fair trade.
-            </p>
+          {errors.price ? (
+            <p className="text-xs text-destructive">{errors.price}</p>
+          ) : (
+            isExchange && (
+              <p className="text-xs text-muted-foreground">
+                What you pay now — helps the other person judge a fair trade.
+              </p>
+            )
           )}
         </div>
-        <div className="space-y-2">
+        <div ref={registerField("district")} className="space-y-2">
           <Label>District</Label>
-          <Select
+          <Combobox
+            className={cn("w-full", errors.district && "border-destructive")}
+            placeholder="Select district"
+            searchPlaceholder="Search districts…"
             items={districtItems}
-            value={district}
-            onValueChange={(value) => {
-              setDistrict(value);
+            value={district ?? ""}
+            onChange={(value) => {
+              setDistrict(value || null);
               setPlace(null);
+              clearError("district");
             }}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select district" />
-            </SelectTrigger>
-            <SelectContent>
-              {districtItems.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          />
+          {errors.district && <p className="text-xs text-destructive">{errors.district}</p>}
         </div>
-        <div className="space-y-2">
+        <div ref={registerField("place")} className="space-y-2">
           <Label>Area</Label>
-          <Select items={placeItems} value={place} onValueChange={setPlace} disabled={!district}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select area" />
-            </SelectTrigger>
-            <SelectContent>
-              {placeItems.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Combobox
+            className={cn("w-full", errors.place && "border-destructive")}
+            placeholder="Select area"
+            searchPlaceholder="Search areas…"
+            items={placeItems}
+            value={place ?? ""}
+            onChange={(value) => {
+              setPlace(value || null);
+              clearError("place");
+            }}
+            disabled={!district}
+          />
+          {errors.place && <p className="text-xs text-destructive">{errors.place}</p>}
         </div>
       </div>
       <div className="space-y-2">
@@ -439,36 +516,52 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
 
   const contactFields = (
     <>
-      <div className="space-y-2">
+      <div ref={registerField("vendorName")} className="space-y-2">
         <Label htmlFor="vendor-name">Your name</Label>
         <Input
           id="vendor-name"
           placeholder="e.g. Tashi Dorji"
           value={vendorName}
-          onChange={(e) => setVendorName(e.target.value)}
+          aria-invalid={!!errors.vendorName}
+          onChange={(e) => {
+            setVendorName(e.target.value);
+            clearError("vendorName");
+          }}
         />
+        {errors.vendorName && <p className="text-xs text-destructive">{errors.vendorName}</p>}
       </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="whatsapp">WhatsApp</Label>
-          <Input
-            id="whatsapp"
-            inputMode="tel"
-            placeholder="e.g. 17123456"
-            value={whatsapp}
-            onChange={(e) => setWhatsapp(e.target.value)}
-          />
+      <div ref={registerField("contact")} className="space-y-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="whatsapp">WhatsApp</Label>
+            <Input
+              id="whatsapp"
+              inputMode="tel"
+              placeholder="e.g. 17123456"
+              value={whatsapp}
+              aria-invalid={!!errors.contact}
+              onChange={(e) => {
+                setWhatsapp(e.target.value);
+                clearError("contact");
+              }}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone</Label>
+            <Input
+              id="phone"
+              inputMode="tel"
+              placeholder="e.g. 17123456"
+              value={phone}
+              aria-invalid={!!errors.contact}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                clearError("contact");
+              }}
+            />
+          </div>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="phone">Phone</Label>
-          <Input
-            id="phone"
-            inputMode="tel"
-            placeholder="e.g. 17123456"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-          />
-        </div>
+        {errors.contact && <p className="text-xs text-destructive">{errors.contact}</p>}
       </div>
     </>
   );
@@ -476,48 +569,37 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
   const lookingForFields = (
     <>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
+        <div ref={registerField("wantDistrict")} className="space-y-2">
           <Label>District</Label>
-          <Select
+          <Combobox
+            className={cn("w-full", errors.wantDistrict && "border-destructive")}
+            placeholder="Select district"
+            searchPlaceholder="Search districts…"
             items={districtItems}
-            value={wantDistrict}
-            onValueChange={(value) => {
-              setWantDistrict(value);
+            value={wantDistrict ?? ""}
+            onChange={(value) => {
+              setWantDistrict(value || null);
               setWantPlace(null);
+              clearError("wantDistrict");
             }}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select district" />
-            </SelectTrigger>
-            <SelectContent>
-              {districtItems.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">Required — where you want to move.</p>
+          />
+          {errors.wantDistrict ? (
+            <p className="text-xs text-destructive">{errors.wantDistrict}</p>
+          ) : (
+            <p className="text-xs text-muted-foreground">Required — where you want to move.</p>
+          )}
         </div>
         <div className="space-y-2">
           <Label>Area</Label>
-          <Select
+          <Combobox
+            className="w-full"
+            placeholder="Any area"
+            searchPlaceholder="Search areas…"
             items={wantPlaceItems}
-            value={wantPlace}
-            onValueChange={setWantPlace}
+            value={wantPlace ?? ""}
+            onChange={(value) => setWantPlace(value || null)}
             disabled={!wantDistrict}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Any area" />
-            </SelectTrigger>
-            <SelectContent>
-              {wantPlaceItems.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          />
           <p className="text-xs text-muted-foreground">Optional.</p>
         </div>
       </div>
@@ -620,8 +702,8 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
             <div className="space-y-3">
               <h3 className="text-sm font-medium">Photos</h3>
               <p className="text-xs text-muted-foreground">
-                Optional, but listings with photos get far more interest. Each photo is
-                checked automatically right after you add it.
+                Add up to 5 photos. Bedroom, kitchen, and bathroom are required. Each
+                photo is checked automatically right after you add it.
               </p>
               {photosField}
             </div>
@@ -650,8 +732,8 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
           <section className="space-y-3">
             <h2 className="text-sm font-semibold">Photos</h2>
             <p className="text-xs text-muted-foreground">
-              Optional, but listings with photos get far more interest. Each photo is
-              checked automatically right after you add it.
+              Add up to 5 photos. Bedroom, kitchen, and bathroom are required. Each
+              photo is checked automatically right after you add it.
             </p>
             {photosField}
           </section>

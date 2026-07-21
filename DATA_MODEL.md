@@ -7,7 +7,7 @@
 | `id` | uuid, primary key | auto-generated |
 | `district` | text | select-only from fixed list — used as a filter |
 | `place` | text | select-only from fixed list (dependent on district) — used as a filter |
-| `room_type` | text (enum-like: `studio`, `1bhk`, `2bhk`) | used as a filter |
+| `room_type` | text (enum-like: `studio`, `1bhk`, `2bhk`, `3bhk`, `4bhk`, `shared`, `house`, `shophouse`, `commercial`) | used as a filter |
 | `price` | integer | monthly rent in Nu. — used for price range filter |
 | `description` | text | free text |
 | `amenities` | text or text[] | e.g., "Wi-Fi, Parking, Water 24/7" — simplest: comma-separated text for v1 |
@@ -24,9 +24,9 @@
 - Price filter on the frontend should query `price >= min AND price <= max`.
 - **Both `district` and `place` are select-only (dropdown) fields, everywhere — filters and the post form. No free text/typing allowed for either.** `place` options depend on the selected `district` (cascading dropdown).
 
-## Reference data: districts & places (mock, hardcode for now)
+## Reference data: districts & places (real data, hardcoded in frontend)
 
-Not a database table yet — just a hardcoded object/array in the frontend for v1. Real data can replace this later.
+Not a database table yet — a hardcoded object in `lib/districts.ts`. As of the real-data update this holds all 20 Bhutanese districts (Dzongkhags) with their actual rental areas (source: `bhutan-districts.md`). The example below is the earlier mock; see `lib/districts.ts` for the full current list.
 
 ```js
 const DISTRICTS_AND_PLACES = {
