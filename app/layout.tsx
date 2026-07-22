@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Figtree } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,23 @@ export const metadata: Metadata = {
   title: "GetYourRoom — Rooms for rent in Bhutan",
   description:
     "Find rooms and flats for rent across Bhutan, or post your own listing — free, no account needed to browse.",
+  // iOS "Add to Home Screen" support (Android uses the manifest above).
+  // Renders apple-mobile-web-app-* meta tags; the apple-icon is auto-detected
+  // from app/apple-icon.png.
+  appleWebApp: {
+    capable: true,
+    title: "GetYourRoom",
+    statusBarStyle: "default",
+  },
+  // Explicit legacy iOS tag (Next emits the modern `mobile-web-app-capable`;
+  // older iOS Safari uses the apple-prefixed one for standalone launch).
+  other: {
+    "apple-mobile-web-app-capable": "yes",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#ffffff",
 };
 
 export default function RootLayout({

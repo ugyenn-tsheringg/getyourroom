@@ -4,7 +4,14 @@ import { use, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { CallIcon, Image02Icon, WhatsappIcon } from "@hugeicons/core-free-icons";
+import {
+  BedSingle01Icon,
+  CallIcon,
+  Image02Icon,
+  Location01Icon,
+  Wallet01Icon,
+  WhatsappIcon,
+} from "@hugeicons/core-free-icons";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -174,6 +181,15 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
         />
       </div>
 
+      <div className="mt-3 text-right">
+        <Link
+          href="/get-app"
+          className="text-sm text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+        >
+          Want the app?
+        </Link>
+      </div>
+
       <div className="mt-8 grid items-start gap-10 lg:grid-cols-[1fr_360px]">
         <div>
           {isExchange && (
@@ -191,37 +207,6 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
               / month{isExchange && " · Current Rent"}
             </span>
           </p>
-
-          {isExchange && (
-            <>
-              <Separator className="my-6" />
-              <h2 className="text-base font-semibold">Looking for in return</h2>
-              <div className="mt-3 flex flex-wrap gap-x-8 gap-y-4 text-[15px] leading-7 text-foreground/80">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Wants a room in</p>
-                  <p className="mt-1">
-                    {room.exchange_want_place
-                      ? `${room.exchange_want_place}, ${room.exchange_want_district}`
-                      : room.exchange_want_district}
-                  </p>
-                </div>
-                {room.exchange_want_room_types.length > 0 && (
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Room type</p>
-                    <p className="mt-1">
-                      {room.exchange_want_room_types.map((t) => roomTypeLabel(t)).join(", ")}
-                    </p>
-                  </div>
-                )}
-                {(room.exchange_budget_min != null || room.exchange_budget_max != null) && (
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Budget for the new room</p>
-                    <p className="mt-1">{budgetRange(room.exchange_budget_min, room.exchange_budget_max)}</p>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
 
           {room.description && (
             <>
@@ -270,6 +255,56 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                 Open in Google Maps
               </a>
             </>
+          )}
+
+          {isExchange && (
+            <div className="mt-6 rounded-3xl bg-muted/60 p-5 ring-1 ring-foreground/10 sm:p-6">
+              <h2 className="text-xl font-semibold tracking-tight">Looking for in return</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                What this vendor wants in exchange for their room above.
+              </p>
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-background ring-1 ring-foreground/10">
+                    <HugeiconsIcon icon={Location01Icon} strokeWidth={2} className="size-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Wants a room in</p>
+                    <p className="font-medium">
+                      {room.exchange_want_place
+                        ? `${room.exchange_want_place}, ${room.exchange_want_district}`
+                        : room.exchange_want_district}
+                    </p>
+                  </div>
+                </div>
+                {room.exchange_want_room_types.length > 0 && (
+                  <div className="flex items-center gap-3">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-background ring-1 ring-foreground/10">
+                      <HugeiconsIcon icon={BedSingle01Icon} strokeWidth={2} className="size-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted-foreground">Room type</p>
+                      <p className="font-medium">
+                        {room.exchange_want_room_types.map((t) => roomTypeLabel(t)).join(", ")}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {(room.exchange_budget_min != null || room.exchange_budget_max != null) && (
+                  <div className="flex items-center gap-3">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-background ring-1 ring-foreground/10">
+                      <HugeiconsIcon icon={Wallet01Icon} strokeWidth={2} className="size-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted-foreground">Budget for the new room</p>
+                      <p className="font-medium">
+                        {budgetRange(room.exchange_budget_min, room.exchange_budget_max)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
 
           <div className="mt-8 flex items-center justify-between gap-4">
