@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { StarIcon } from "@hugeicons/core-free-icons";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -24,6 +26,7 @@ const CATEGORIES = [
 ];
 
 export default function FeedbackPage() {
+  const router = useRouter();
   const [rating, setRating] = useState(0);
   const [hovered, setHovered] = useState(0);
   const [name, setName] = useState("");
@@ -73,6 +76,21 @@ export default function FeedbackPage() {
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
           Your feedback helps make GetYourRoom better for everyone in Bhutan.
         </p>
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+          <Button
+            variant="outline"
+            onClick={() => router.back()}
+            className="h-10 rounded-full sm:min-w-40"
+          >
+            Go back
+          </Button>
+          <Link
+            href="/"
+            className={cn(buttonVariants(), "h-10 rounded-full sm:min-w-40")}
+          >
+            Browse rooms
+          </Link>
+        </div>
       </div>
     );
   }

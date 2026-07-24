@@ -61,6 +61,8 @@ Route: `/rooms/[id]`
 - **Report listing** dialog for renters to flag a listing. **Done.**
 - **View count** — shown to the listing owner only; incremented once per visit via an RPC. **Done** (not in original plan).
 - "This room is no longer available" banner for rented/expired listings. **Done.**
+- **"Want the app?" link** under the photo gallery, pointing to `/get-app` (styled with a visible "Click here!" blue underline). **Done.**
+- **Legal disclaimer** at the foot of every listing — a small, understated info-icon line: "The advertiser assumes all responsibility for the advertisement details." **Done.**
 
 ### 3. Post a room page — **State: done (materially expanded)**
 Route: `/post` — **now behind sign-in** (redirects to `/login?next=/post`).
@@ -106,10 +108,12 @@ Route: `/admin`. Access limited to the single `ADMIN_EMAIL`; enforced server-sid
 - **Feedback** — average rating + all submitted feedback.
 
 ### 9. Feedback — **State: done** _(new)_
-Route: `/feedback` (public, linked in the footer). Star rating + message + optional category/name/email; hidden honeypot field for spam. Writes to a `feedback` table.
+Route: `/feedback` (public, linked in the footer). Star rating + message + optional category/name/email; hidden honeypot field for spam. Writes to a `feedback` table. After submitting, a thank-you confirmation offers two navigation buttons: **Go back** (previous page) and **Browse rooms** (home). **Done.**
 
 ### 10. Get the app (PWA) — **State: done** _(new)_
-Route: `/get-app`. Instructions for "Add to Home Screen" on iOS/Android. The site ships a web app manifest (`/manifest.webmanifest`) and Apple web-app meta tags for a standalone, installable experience. No native app / app store.
+Route: `/get-app`. Instructions for "Add to Home Screen" on iOS/Android. The site ships a web app manifest (`/manifest.webmanifest`) and Apple web-app meta tags for a standalone, installable experience. No native app / app store. Linked from a "Want the app? Click here!" item in the site footer and from each listing page.
+
+**Site footer** carries three items: a copyright line ("© 2026 GetYourRoom. All rights reserved."), a "Want the app? Click here!" link to `/get-app`, and a "Have feedback? Click here!" link to `/feedback`.
 
 ## Out of scope (for now)
 - ~~Login/accounts for vendors or renters~~ — **now built** for vendors (email OTP; required to post) and optional for renters (saving). Renters can still browse fully without an account.
