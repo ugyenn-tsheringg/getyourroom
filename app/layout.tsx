@@ -53,11 +53,22 @@ export default function RootLayout({
         <SiteHeader />
         <main className="flex-1">{children}</main>
         <footer className="border-t border-border/60">
-          <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-8 text-sm text-muted-foreground sm:px-6">
-            <span>GetYourRoom — rooms and flats for rent across Bhutan.</span>
-            <a href="/feedback" className="shrink-0 underline-offset-2 hover:text-foreground hover:underline">
-              Feedback
-            </a>
+          <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <span>© 2026 GetYourRoom. All rights reserved.</span>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+              <a href="/get-app">
+                Want the app?{" "}
+                <span className="font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700">
+                  Click here!
+                </span>
+              </a>
+              <a href="/feedback">
+                Have feedback?{" "}
+                <span className="font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700">
+                  Click here!
+                </span>
+              </a>
+            </div>
           </div>
         </footer>
       </body>

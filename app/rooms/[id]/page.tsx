@@ -8,6 +8,7 @@ import {
   BedSingle01Icon,
   CallIcon,
   Image02Icon,
+  InformationCircleIcon,
   Location01Icon,
   Location09Icon,
   Sofa01Icon,
@@ -183,11 +184,11 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
       </div>
 
       <div className="mt-3 text-right">
-        <Link
-          href="/get-app"
-          className="text-sm text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
-        >
-          Want the app?
+        <Link href="/get-app" className="text-sm">
+          <span className="text-muted-foreground">Want the app? </span>
+          <span className="font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700">
+            Click here!
+          </span>
         </Link>
       </div>
 
@@ -370,6 +371,18 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
           </CardContent>
         </Card>
       </div>
+
+      <p className="mt-10 flex items-start gap-1.5 text-xs text-muted-foreground/70">
+        <HugeiconsIcon
+          icon={InformationCircleIcon}
+          strokeWidth={2}
+          className="mt-px size-3.5 shrink-0"
+        />
+        <span>
+          Legal Disclaimer: The advertiser assumes all responsibility for the
+          advertisement details.
+        </span>
+      </p>
     </div>
   );
 }
