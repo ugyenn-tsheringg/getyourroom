@@ -19,6 +19,9 @@ export type Room = {
   price: number;
   description: string | null;
   amenities: string | null;
+  utilities: string | null;
+  furnishing: string | null;
+  landmark: string | null;
   images: string[];
   vendor_name: string;
   vendor_whatsapp: string | null;

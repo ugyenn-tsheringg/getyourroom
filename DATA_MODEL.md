@@ -20,7 +20,10 @@ Last synced: 2026-07-23 @ 371fdda
 | `room_type` | text | NOT NULL, CHECK in (`studio`, `1bhk`, `2bhk`, `3bhk`, `4bhk`, `shared`, `house`, `shophouse`, `commercial`) | used as a filter |
 | `price` | integer | NOT NULL | monthly rent in Nu. — used for price range filter |
 | `description` | text | nullable | free text |
-| `amenities` | text | nullable | comma-separated string (e.g. "Wi-Fi, Parking, Water 24/7") — kept as plain text, not a tag system |
+| `amenities` | text | nullable | comma-separated string — now sourced from the post form's **Amenities** checklist (predefined items + custom free-text entries); custom items have commas stripped. Predefined labels map to specific icons on the detail page, custom ones to a tick |
+| `utilities` | text | nullable | comma-separated string from the post form's **Utilities** checklist (same predefined-plus-custom model as `amenities`) |
+| `furnishing` | text | nullable, CHECK null or in (`unfurnished`, `semi_furnished`, `fully_furnished`) | single choice (radio-style) — furnishing status |
+| `landmark` | text | nullable | optional free text — a nearby landmark, shown as "Near to …" on the detail page |
 | `images` | text[] | NOT NULL, default `'{}'` | array of Cloudinary image URLs, can be empty |
 | `vendor_name` | text | NOT NULL | |
 | `vendor_whatsapp` | text | nullable | number or ID |
@@ -181,7 +184,12 @@ feedback form submissions. No user/room relationship.
 - `images` can be an empty array — the form allows posting with zero photos at
   the DB level, though the current post form enforces required photo slots in the
   UI.
-- `amenities` is a simple comma-separated text field, not a tags/checkbox system.
+- `amenities` and `utilities` are comma-separated text fields, but the post form
+  now drives them via **checklists** of predefined items (each with its own icon)
+  plus custom free-text entries. `lib/features.ts` holds the predefined
+  `UTILITIES`/`AMENITIES` lists, the `featureIcon()` label→icon lookup (custom =
+  tick), the `FURNISHING_OPTIONS`, and the parse/serialize helpers. Existing rows'
+  amenities keep working — unmatched labels just render with the tick icon.
 - Price filter on the frontend queries `price >= min AND price <= max`.
 - **Both `district` and `place` are select-only (dropdown/combobox) fields,
   everywhere — filters and the post form. No free text/typing.** `place` options

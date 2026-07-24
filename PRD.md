@@ -51,7 +51,9 @@ Route: `/rooms/[id]`
 - Image gallery/carousel of all uploaded photos (with counter; graceful "no photos" state). **Done.**
 - Price, room type, district, place. **Done.**
 - Description. **Done.**
-- Amenities — stored as a comma-separated string, rendered as tags/badges. **Done.** (Original plan floated "free text or tags"; shipped as comma-separated tags.)
+- Utilities & Amenities — two icon checklists of predefined items plus custom free-text entries, shown together as a "What's included" icon + label grid (predefined = specific icon, custom = tick). **Done.** (Superseded the earlier comma-separated tag/badge rendering.)
+- Furnishing status — Unfurnished / Semi-furnished / Fully Furnished, shown as a badge. **Done.**
+- Landmark — optional "Near to …" line shown right after the map / location section. **Done.**
 - Vendor contact section: name, WhatsApp button (`wa.me`), call button (`tel:`). Bhutan 8-digit numbers get the `975` country code automatically. **Done.** (WhatsApp _and_ phone are each optional individually; at least one is required at post time.)
 - **Map** — embedded Google Map + "Open in Google Maps", shown only when the listing has a pinned location (lat/lng). **Done** (partial location feature; see note in _Out of scope_).
 - **Exchange section** — for exchange listings, a "Looking for in return" block (wanted district/place, room types, budget). **Done** (not in original plan).
@@ -71,7 +73,9 @@ Uses the shared room form (also used for editing).
 - District + Area (dependent searchable dropdowns). **Done.**
 - Rent (price, Nu./month). **Done.**
 - Description. **Done.**
-- Amenities (comma-separated). **Done.**
+- **Utilities** and **Amenities** — checkbox grids of predefined items (each with its own icon) plus an "add your own" free-text entry. **Done.**
+- **Furnishing status** — single choice: Unfurnished / Semi-furnished / Fully Furnished. **Done.**
+- **Landmark** — optional "Near to …" free text. **Done.**
 - **Listing expiry** — optional: auto-hide after 30/60/90 days, or no expiry. **Done** (not in original plan).
 - **Location picker** — optional map pin (lat/lng). **Done** (not in original plan).
 - Exchange sub-fields (only when "Looking to exchange"): wanted district (required), wanted area, wanted room types (multi-select), budget min–max. **Done.**

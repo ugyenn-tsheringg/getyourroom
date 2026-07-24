@@ -9,10 +9,11 @@ import {
   CallIcon,
   Image02Icon,
   Location01Icon,
+  Location09Icon,
+  Sofa01Icon,
   Wallet01Icon,
   WhatsappIcon,
 } from "@hugeicons/core-free-icons";
-import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -28,6 +29,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ReportDialog } from "@/components/report-dialog";
 import { SaveButton } from "@/components/save-button";
 import { roomTypeLabel } from "@/lib/districts";
+import { featureIcon, furnishingLabel, parseFeatures } from "@/lib/features";
 import { fetchRoom } from "@/lib/rooms";
 import { supabase } from "@/lib/supabase";
 import { isRoomUnavailable, type Room } from "@/lib/types";
@@ -147,10 +149,9 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
 
   const title = `${roomTypeLabel(room.room_type)} in ${room.place}`;
   const isExchange = room.listing_type === "exchange";
-  const amenities = (room.amenities ?? "")
-    .split(",")
-    .map((a) => a.trim())
-    .filter(Boolean);
+  // Utilities and amenities are shown together as one icon grid.
+  const features = [...parseFeatures(room.utilities), ...parseFeatures(room.amenities)];
+  const furnishing = furnishingLabel(room.furnishing);
   const posted = new Date(room.created_at).toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
@@ -207,6 +208,12 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
               / month{isExchange && " · Current Rent"}
             </span>
           </p>
+          {furnishing && (
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1.5 text-sm font-medium">
+              <HugeiconsIcon icon={Sofa01Icon} strokeWidth={2} className="size-4" />
+              {furnishing}
+            </div>
+          )}
 
           {room.description && (
             <>
@@ -218,15 +225,18 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
             </>
           )}
 
-          {amenities.length > 0 && (
+          {features.length > 0 && (
             <>
               <Separator className="my-6" />
-              <h2 className="text-base font-semibold">Amenities</h2>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {amenities.map((amenity) => (
-                  <Badge key={amenity} variant="secondary" className="h-auto rounded-full px-3 py-1">
-                    {amenity}
-                  </Badge>
+              <h2 className="text-base font-semibold">What&apos;s included</h2>
+              <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+                {features.map((feature) => (
+                  <div key={feature} className="flex items-center gap-3">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-foreground/80">
+                      <HugeiconsIcon icon={featureIcon(feature)} strokeWidth={2} className="size-4" />
+                    </span>
+                    <span className="text-sm">{feature}</span>
+                  </div>
                 ))}
               </div>
             </>
@@ -255,6 +265,13 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                 Open in Google Maps
               </a>
             </>
+          )}
+
+          {room.landmark && (
+            <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+              <HugeiconsIcon icon={Location09Icon} strokeWidth={2} className="size-4 shrink-0" />
+              Near to {room.landmark}
+            </p>
           )}
 
           {isExchange && (

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Add01Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, Cancel01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Combobox } from "@/components/combobox";
 import { LocationPicker, type LatLng } from "@/components/location-picker";
 import { PhotoThumb, type PhotoStatus } from "@/components/photo-thumb";
@@ -20,6 +20,14 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { DISTRICTS, DISTRICTS_AND_PLACES, ROOM_TYPES } from "@/lib/districts";
+import {
+  AMENITIES,
+  UTILITIES,
+  FURNISHING_OPTIONS,
+  type Feature,
+  parseFeatures,
+  serializeFeatures,
+} from "@/lib/features";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/use-session";
 import type { ListingType, Room } from "@/lib/types";
@@ -52,6 +60,123 @@ const FIELD_ORDER = [
   "vendorName",
   "contact",
 ] as const;
+
+// A checklist of predefined features (each with its own icon) plus a free-text
+// box for adding custom items. `selected` holds every chosen label — predefined
+// and custom together; customs are whatever isn't in `options`.
+function FeatureChecklist({
+  title,
+  options,
+  selected,
+  onChange,
+  customPlaceholder,
+}: {
+  title: string;
+  options: readonly Feature[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  customPlaceholder: string;
+}) {
+  const [custom, setCustom] = useState("");
+  const predefinedLabels = new Set(options.map((o) => o.label));
+  const customItems = selected.filter((s) => !predefinedLabels.has(s));
+
+  const toggle = (label: string) =>
+    onChange(
+      selected.includes(label) ? selected.filter((s) => s !== label) : [...selected, label]
+    );
+
+  const addCustom = () => {
+    const value = custom.replace(/,/g, "").trim();
+    if (value && !selected.some((s) => s.toLowerCase() === value.toLowerCase())) {
+      onChange([...selected, value]);
+    }
+    setCustom("");
+  };
+
+  return (
+    <div className="space-y-3">
+      <Label>{title}</Label>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {options.map((opt) => {
+          const active = selected.includes(opt.label);
+          return (
+            <button
+              key={opt.label}
+              type="button"
+              onClick={() => toggle(opt.label)}
+              aria-pressed={active}
+              className={cn(
+                "flex items-center gap-3 rounded-2xl border px-3.5 py-2.5 text-left text-sm transition-colors",
+                active
+                  ? "border-primary bg-primary/5 text-foreground"
+                  : "border-input text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+              )}
+            >
+              <span
+                className={cn(
+                  "flex size-9 shrink-0 items-center justify-center rounded-full",
+                  active ? "bg-primary text-primary-foreground" : "bg-muted text-foreground/70"
+                )}
+              >
+                <HugeiconsIcon icon={opt.icon} strokeWidth={2} className="size-4" />
+              </span>
+              <span className="flex-1 font-medium">{opt.label}</span>
+              <span
+                className={cn(
+                  "flex size-5 shrink-0 items-center justify-center rounded-full border",
+                  active ? "border-primary bg-primary text-primary-foreground" : "border-input"
+                )}
+              >
+                {active && <HugeiconsIcon icon={Tick02Icon} strokeWidth={3} className="size-3" />}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {customItems.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {customItems.map((item) => (
+            <span
+              key={item}
+              className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-sm"
+            >
+              <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-3.5" />
+              {item}
+              <button
+                type="button"
+                onClick={() => onChange(selected.filter((s) => s !== item))}
+                className="ml-0.5 text-muted-foreground transition-colors hover:text-foreground"
+                aria-label={`Remove ${item}`}
+              >
+                <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-3.5" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <Input
+          value={custom}
+          onChange={(e) => setCustom(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addCustom();
+            }
+          }}
+          placeholder={customPlaceholder}
+          className="flex-1"
+        />
+        <Button type="button" variant="outline" onClick={addCustom} className="rounded-full px-5">
+          Add
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 // adminOverride: the admin editing someone else's listing — the update goes
 // through the admin API route since RLS only allows owners to update directly.
@@ -92,7 +217,10 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
   const [place, setPlace] = useState<string | null>(initial?.place ?? null);
   const [price, setPrice] = useState(initial ? String(initial.price) : "");
   const [description, setDescription] = useState(initial?.description ?? "");
-  const [amenities, setAmenities] = useState(initial?.amenities ?? "");
+  const [amenities, setAmenities] = useState<string[]>(parseFeatures(initial?.amenities));
+  const [utilities, setUtilities] = useState<string[]>(parseFeatures(initial?.utilities));
+  const [furnishing, setFurnishing] = useState<string | null>(initial?.furnishing ?? null);
+  const [landmark, setLandmark] = useState(initial?.landmark ?? "");
   const [vendorName, setVendorName] = useState(initial?.vendor_name ?? "");
   const [whatsapp, setWhatsapp] = useState(initial?.vendor_whatsapp ?? "");
   const [phone, setPhone] = useState(initial?.vendor_phone ?? "");
@@ -250,7 +378,10 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
         room_type: roomType,
         price: Number(price),
         description: description.trim() || null,
-        amenities: amenities.trim() || null,
+        amenities: serializeFeatures(amenities),
+        utilities: serializeFeatures(utilities),
+        furnishing,
+        landmark: landmark.trim() || null,
         images: PHOTO_SLOTS.map((s) => slots[s.key].url).filter((u): u is string => Boolean(u)),
         vendor_name: vendorName.trim(),
         vendor_whatsapp: whatsapp.trim() || null,
@@ -483,15 +614,51 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
           onChange={(e) => setDescription(e.target.value)}
         />
       </div>
+      <FeatureChecklist
+        title="Utilities"
+        options={UTILITIES}
+        selected={utilities}
+        onChange={setUtilities}
+        customPlaceholder="Add another utility…"
+      />
+      <FeatureChecklist
+        title="Amenities"
+        options={AMENITIES}
+        selected={amenities}
+        onChange={setAmenities}
+        customPlaceholder="Add another amenity…"
+      />
       <div className="space-y-2">
-        <Label htmlFor="amenities">Amenities</Label>
+        <Label>Furnishing status</Label>
+        <ToggleGroup
+          value={furnishing ? [furnishing] : []}
+          onValueChange={(value) => setFurnishing((value[value.length - 1] as string) ?? null)}
+          variant="outline"
+          className="flex-wrap"
+        >
+          {FURNISHING_OPTIONS.map((opt) => (
+            <ToggleGroupItem
+              key={opt.value}
+              value={opt.value}
+              className="h-9 rounded-full px-4 text-sm aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary"
+            >
+              {opt.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        <p className="text-xs text-muted-foreground">Optional — pick one.</p>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="landmark">Near to</Label>
         <Input
-          id="amenities"
-          placeholder="e.g. Wi-Fi, Parking, 24/7 Water"
-          value={amenities}
-          onChange={(e) => setAmenities(e.target.value)}
+          id="landmark"
+          placeholder="e.g. Norzin Lam, or the hospital"
+          value={landmark}
+          onChange={(e) => setLandmark(e.target.value)}
         />
-        <p className="text-xs text-muted-foreground">Separate with commas.</p>
+        <p className="text-xs text-muted-foreground">
+          Optional — a nearby landmark to help people place the location.
+        </p>
       </div>
       <div className="space-y-2">
         <Label>Listing expiry</Label>
