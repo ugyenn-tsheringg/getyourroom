@@ -3,7 +3,7 @@
 Behavioral guidelines to reduce common LLM coding mistakes, plus project-specific context below.
 
 **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
-
+/btw
 ## 1. Think Before Coding
 
 **Don't assume. Don't hide confusion. Surface tradeoffs.**
@@ -77,7 +77,7 @@ A website for people in Bhutan to find rooms/flats to rent, and for room owners 
 - **Database:** Supabase (Postgres) — stores all room listing data
 - **Image storage:** Cloudinary — stores and serves uploaded room images (NOT Supabase Storage)
 - **Hosting:** Vercel
-- **Auth:** Supabase Auth (email or phone OTP) for vendors who want to post a room. Renters can browse without an account.
+- **Auth:** Supabase Auth (email OTP) for vendors who want to post a room. Renters can browse without an account.
 
 ## Current scope (MVP)
 1. Browse page — list of room listings
@@ -85,12 +85,12 @@ A website for people in Bhutan to find rooms/flats to rent, and for room owners 
 3. Room detail page — images, price, location, description, contact info
 4. "Post a room" page — public form, no auth, writes directly to Supabase, uploads images to Cloudinary
 5. Nothing else. No payments, no subscriptions, no messaging, no user accounts.
+6. Admin/moderation dashboard
+
 
 ## Explicitly out of scope for now
 - Vendor subscription tiers or payments
 - Video uploads (images only)
-- Admin/moderation dashboard
-- Search beyond location text + room type filter
 
 ## Data model (rooms table)
 - `id`
@@ -102,6 +102,6 @@ A website for people in Bhutan to find rooms/flats to rent, and for room owners 
 - `contact_name` (text, placeholder for future user_id)
 - `contact_phone` (text)
 - `created_at`
-
+ 
 ## Auth notes
 Vendor posts a room only after signing in (Supabase Auth). Store `user_id` on each room row and add row-level security so vendors can only edit/delete their own listings. Renters need no account to browse or view listings.

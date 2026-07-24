@@ -206,3 +206,5 @@ The earlier 10-district mock (`Thimphu`, `Paro`, `Punakha`, `Wangdue Phodrang`,
 current list. Note some pre-real-data listings still store district/place strings
 that no longer appear in the current list (e.g. "Trongsa Town",
 "Chukha (Phuentsholing)", "Bajo Town"); they display but won't match new filters.
+Many of the 40 live rows are also mock/seed listings (~33 owned by the
+`test.vendor` account) kept for pagination testing, not real inventory.
