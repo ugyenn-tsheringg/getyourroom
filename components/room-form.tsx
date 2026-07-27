@@ -29,6 +29,7 @@ import {
   serializeFeatures,
 } from "@/lib/features";
 import { supabase } from "@/lib/supabase";
+import { saveExchangeSearches } from "@/lib/saved-searches";
 import { useSession } from "@/lib/use-session";
 import type { ListingType, Room } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -60,6 +61,40 @@ const FIELD_ORDER = [
   "vendorName",
   "contact",
 ] as const;
+
+function isHeic(file: File): boolean {
+  const name = file.name.toLowerCase();
+  return /image\/hei[cf]/.test(file.type) || name.endsWith(".heic") || name.endsWith(".heif");
+}
+
+// Runs in the browser before every upload: HEIC/HEIF → JPEG (Sightengine can't
+// read HEIC), then downscale + compress so the file stays well under Vercel's
+// ~4.5MB request cap and Cloudinary's 25MP limit (4096px max side ≈ 16.7MP).
+// Both libraries are dynamically imported so they stay out of the server bundle.
+async function prepareImage(file: File): Promise<File> {
+  let working = file;
+  if (isHeic(file)) {
+    const heic2any = (await import("heic2any")).default;
+    const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+    const blob = Array.isArray(converted) ? converted[0] : converted;
+    working = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+  }
+  const imageCompression = (await import("browser-image-compression")).default;
+  return imageCompression(working, {
+    maxSizeMB: 2,
+    maxWidthOrHeight: 4096,
+    useWebWorker: true,
+  });
+}
+
+// Fallback message when the upload route replies without a JSON error body
+// (e.g. the platform rejects an oversized request before our code runs).
+function uploadErrorMessage(status: number): string {
+  if (status === 413) return "This photo is too large. Please try a smaller one.";
+  if (status === 415)
+    return "This file format isn't supported. Please upload a JPG, PNG, or HEIC photo.";
+  return "Something went wrong uploading this photo. Please try again.";
+}
 
 // A checklist of predefined features (each with its own icon) plus a free-text
 // box for adding custom items. `selected` holds every chosen label — predefined
@@ -235,6 +270,9 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
   const [budgetMax, setBudgetMax] = useState(
     initial?.exchange_budget_max != null ? String(initial.exchange_budget_max) : ""
   );
+  // Exchange posters can opt into a daily email alert when a room matching what
+  // they want in return is posted. Only offered on new posts (see below).
+  const [notifyOnMatch, setNotifyOnMatch] = useState(false);
   const [location, setLocation] = useState<LatLng | null>(
     initial?.latitude != null && initial?.longitude != null
       ? { lat: initial.latitude, lng: initial.longitude }
@@ -273,32 +311,54 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
 
   // Each photo is scanned (Sightengine) and uploaded to Cloudinary immediately
   // on selection, so publishing doesn't have to wait for it. One photo per slot.
-  function uploadToSlot(key: SlotKey, file: File) {
+  async function uploadToSlot(key: SlotKey, file: File) {
     if (!session) return;
     clearError(key);
-    const preview = URL.createObjectURL(file);
-    setSlots((prev) => ({ ...prev, [key]: { status: "scanning", preview } }));
 
-    const body = new FormData();
-    body.append("file", file);
-    fetch("/api/upload", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${session.access_token}` },
-      body,
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          const json = await res.json().catch(() => null);
-          throw new Error(json?.error ?? "Upload failed. Please try again.");
-        }
-        const { url } = await res.json();
-        setSlots((prev) => ({ ...prev, [key]: { status: "verified", preview, url } }));
-      })
-      .catch((err: Error) => {
-        URL.revokeObjectURL(preview);
-        setSlots((prev) => ({ ...prev, [key]: { status: "empty" } }));
-        setErrors((prev) => ({ ...prev, [key]: err.message }));
+    // Standard formats preview instantly; HEIC/HEIF can't be rendered by the
+    // browser, so their thumbnail is built from the converted JPEG below.
+    const instant = isHeic(file) ? null : URL.createObjectURL(file);
+    if (instant) {
+      setSlots((prev) => ({ ...prev, [key]: { status: "scanning", preview: instant } }));
+    }
+    let preview = instant;
+
+    try {
+      let prepared: File;
+      try {
+        prepared = await prepareImage(file);
+      } catch {
+        throw new Error("Something went wrong uploading this photo. Please try again.");
+      }
+
+      // Rebuild the thumbnail from the processed file (renderable JPEG for HEIC,
+      // a smaller preview otherwise).
+      if (preview) URL.revokeObjectURL(preview);
+      preview = URL.createObjectURL(prepared);
+      const shown = preview;
+      setSlots((prev) => ({ ...prev, [key]: { status: "scanning", preview: shown } }));
+
+      const body = new FormData();
+      body.append("file", prepared);
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body,
       });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error ?? uploadErrorMessage(res.status));
+      }
+      const { url } = await res.json();
+      setSlots((prev) => ({ ...prev, [key]: { status: "verified", preview: shown, url } }));
+    } catch (err) {
+      if (preview) URL.revokeObjectURL(preview);
+      setSlots((prev) => ({ ...prev, [key]: { status: "empty" } }));
+      setErrors((prev) => ({
+        ...prev,
+        [key]: err instanceof Error ? err.message : uploadErrorMessage(500),
+      }));
+    }
   }
 
   function removeSlot(key: SlotKey) {
@@ -437,6 +497,26 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
           contact_whatsapp: row.vendor_whatsapp,
           contact_phone: row.vendor_phone,
         });
+
+        // Opt-in daily match alert for exchange posters: turn their "looking
+        // for in return" criteria into saved search(es). Failure here must not
+        // block the redirect — the listing itself is already published.
+        if (listingType === "exchange" && notifyOnMatch && wantDistrict) {
+          try {
+            await saveExchangeSearches(
+              {
+                district: wantDistrict,
+                place: wantPlace,
+                roomTypes: wantRoomTypes,
+                budgetMin: budgetMin ? Number(budgetMin) : null,
+                budgetMax: budgetMax ? Number(budgetMax) : null,
+              },
+              session.user.id
+            );
+          } catch (err) {
+            console.error("Failed to create saved search from exchange listing", err);
+          }
+        }
       }
       router.push(`/rooms/${roomId}`);
     } catch (err) {
@@ -892,6 +972,41 @@ export function RoomForm({ initial, adminOverride = false }: { initial?: Room; a
               </p>
             </div>
             {lookingForFields}
+            {!initial && (
+              <button
+                type="button"
+                onClick={() => setNotifyOnMatch((v) => !v)}
+                aria-pressed={notifyOnMatch}
+                className={cn(
+                  "flex w-full items-start gap-3 rounded-2xl border px-4 py-3.5 text-left transition-colors",
+                  notifyOnMatch
+                    ? "border-primary bg-primary/5"
+                    : "border-input hover:border-foreground/30"
+                )}
+              >
+                <span
+                  className={cn(
+                    "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md border",
+                    notifyOnMatch
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-input"
+                  )}
+                >
+                  {notifyOnMatch && (
+                    <HugeiconsIcon icon={Tick02Icon} strokeWidth={3} className="size-3" />
+                  )}
+                </span>
+                <span className="space-y-0.5">
+                  <span className="block text-sm font-medium">
+                    Notify me when a matching room is posted
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    We&apos;ll check once a day and email you if a new listing matches what
+                    you&apos;re looking for.
+                  </span>
+                </span>
+              </button>
+            )}
           </section>
         </>
       ) : (

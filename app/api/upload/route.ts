@@ -46,7 +46,29 @@ export async function POST(request: Request) {
   try {
     const url = await uploadImage(dataUri);
     return NextResponse.json({ url });
-  } catch {
-    return NextResponse.json({ error: "Image upload failed" }, { status: 500 });
+  } catch (err) {
+    // Cloudinary rejects with a plain object ({ message, name, http_code }),
+    // not an Error instance, so read the message defensively.
+    const message = String((err as { message?: string })?.message ?? "").toLowerCase();
+    if (message.includes("too large") || message.includes("file size")) {
+      return NextResponse.json(
+        { error: "This photo is too large. Please try a smaller one." },
+        { status: 413 }
+      );
+    }
+    if (
+      message.includes("format") ||
+      message.includes("invalid image") ||
+      message.includes("unsupported")
+    ) {
+      return NextResponse.json(
+        { error: "This file format isn't supported. Please upload a JPG, PNG, or HEIC photo." },
+        { status: 415 }
+      );
+    }
+    return NextResponse.json(
+      { error: "Something went wrong uploading this photo. Please try again." },
+      { status: 500 }
+    );
   }
 }

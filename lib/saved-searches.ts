@@ -24,6 +24,34 @@ export async function saveSearch(filters: RoomFilters, userId: string): Promise<
   if (error) throw error;
 }
 
+// Auto-created when an exchange poster opts into match alerts. Their "looking
+// for in return" criteria become saved searches — one per wanted room type so
+// each stays an exact match (saved_searches holds a single room_type, matched
+// with `.eq` by the cron); no wanted type means one search matching any type.
+export async function saveExchangeSearches(
+  criteria: {
+    district: string;
+    place: string | null;
+    roomTypes: string[];
+    budgetMin: number | null;
+    budgetMax: number | null;
+  },
+  userId: string
+): Promise<void> {
+  const base = {
+    user_id: userId,
+    district: criteria.district,
+    place: criteria.place,
+    price_min: criteria.budgetMin,
+    price_max: criteria.budgetMax,
+  };
+  const roomTypes: (string | null)[] =
+    criteria.roomTypes.length > 0 ? criteria.roomTypes : [null];
+  const rows = roomTypes.map((room_type) => ({ ...base, room_type }));
+  const { error } = await supabase.from("saved_searches").insert(rows);
+  if (error) throw error;
+}
+
 export async function fetchSavedSearches(): Promise<SavedSearch[]> {
   const { data, error } = await supabase
     .from("saved_searches")
