@@ -71,6 +71,8 @@ Uses the shared room form (also used for editing).
   requires a signed-in account.
 - Listing type toggle: **Renting out a room** vs **Looking to exchange**. **Done** (not in original plan).
 - Photos — **5 fixed, labeled slots**: Bedroom, Kitchen, Bathroom (required), Hall, One more (optional). Each photo is uploaded to Cloudinary immediately and **automatically screened for explicit content (Sightengine)** before it's accepted. **Done** (original plan: "photos optional, multiple" — now min 3 required, capped at 5, and moderated).
+  - Before upload, each photo is processed **in the browser**: iPhone **HEIC/HEIF is converted to JPEG** and every image is **compressed/downscaled** (targets well under 2 MB and the image-size/megapixel limits) so large phone photos (10–20 MB+) upload reliably instead of failing on the hosting request-size cap. Runs automatically on every upload. **Done.**
+  - Genuine upload failures show a specific message (too large / unsupported format / generic) rather than one catch-all. **Done.**
 - Room type (9 options, see Browse). **Done.**
 - District + Area (dependent searchable dropdowns). **Done.**
 - Rent (price, Nu./month). **Done.**
@@ -81,6 +83,7 @@ Uses the shared room form (also used for editing).
 - **Listing expiry** — optional: auto-hide after 30/60/90 days, or no expiry. **Done** (not in original plan).
 - **Location picker** — optional map pin (lat/lng). **Done** (not in original plan).
 - Exchange sub-fields (only when "Looking to exchange"): wanted district (required), wanted area, wanted room types (multi-select), budget min–max. **Done.**
+  - **"Notify me when a matching room is posted"** checkbox under the exchange "what you're looking for" section (new posts only). If checked, submitting auto-creates saved-search email alerts from those criteria — no need to set browse filters manually. See Saved searches. **Done.**
 - Contact: name (required), WhatsApp and/or phone (at least one required). Contact details are saved to the user's profile and **prefilled** on the next post. **Done.**
 - Per-field validation with scroll-to-first-error. **Done.**
 - On submit → writes a row to Supabase `rooms` (with `user_id`), images already on Cloudinary; redirects to the new listing. **Done.**
@@ -98,8 +101,10 @@ Route: `/saved` (signed-in). Rooms the user hearted; unsave from here. Unavailab
 ### 7. Saved searches & email alerts — **State: done** _(new)_
 Route: `/saved-searches` (signed-in). Lists saved filter sets with a human-readable summary; delete from here.
 - A **daily cron** (`/api/cron/alerts`, `0 11 * * *` = 11:00 UTC / 17:00 Bhutan time via `vercel.json`) finds listings created since each search was last notified and emails the owner via **Resend**. A per-search watermark ensures each match alerts once. **Done.** (Daily cadence is forced by Vercel Hobby's once-per-day cron limit.)
+- The alert email uses a **branded, responsive layout**: site logo + name header, a friendly intro line, one card per matching listing (photo thumbnail, room type, location, price, "View listing" button), and a footer linking back to manage saved searches. Table-based with inline styles for email-client compatibility. **Done.**
+- Saved searches can be created two ways: manually via **"Save this search"** on the browse page, or **auto-created** from an exchange listing's "what you're looking for" criteria when the poster opts in on the post form (one saved search per wanted room type). **Done.**
 - Prod dependency: the cron only runs if `RESEND_API_KEY` and `CRON_SECRET` are set in the Vercel environment — otherwise saved-search alerts don't fire in production.
-- Note: saved searches capture district/place/room type/price — **not** the rental-vs-exchange kind.
+- Note: saved searches capture district/place/room type/price — **not** the rental-vs-exchange kind, so they match all listings (rentals and exchanges alike).
 
 ### 8. Admin — **State: done** _(new)_
 Route: `/admin`. Access limited to the single `ADMIN_EMAIL`; enforced server-side on the `/api/admin/*` routes and reflected in the nav. Three tabs:
