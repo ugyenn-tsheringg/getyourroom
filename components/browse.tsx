@@ -3,9 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Filters } from "@/components/filters";
+import { MobileHero } from "@/components/mobile-hero";
+import { MobileFilterSheet } from "@/components/mobile-filter-sheet";
+import { FilterChips } from "@/components/filter-chips";
 import { Pagination } from "@/components/pagination";
 import { RoomCard } from "@/components/room-card";
+import { MobileRoomCard } from "@/components/mobile-room-card";
 import { SaveSearchButton } from "@/components/save-search-button";
+import { ToastProvider, Toaster } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchRoomsPage, PAGE_SIZE, type RoomFilters } from "@/lib/rooms";
@@ -62,8 +67,16 @@ export function Browse() {
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
+    <ToastProvider>
     <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-      <section className="relative mt-4 overflow-hidden rounded-3xl bg-primary bg-[radial-gradient(55%_65%_at_50%_100%,var(--muted)_0%,var(--primary)_100%)] text-center">
+      {/* Mobile (below md): shorter hero with unified search, a filter sheet, and active-filter chips */}
+      <div className="md:hidden">
+        <MobileHero />
+        <FilterChips className="mt-4" />
+      </div>
+
+      {/* Desktop (md and up): unchanged hero + inline filters */}
+      <section className="relative mt-4 hidden overflow-hidden rounded-3xl bg-primary bg-[radial-gradient(55%_65%_at_50%_100%,var(--muted)_0%,var(--primary)_100%)] text-center md:block">
         <div className="relative px-4 pt-8 pb-12 sm:pt-10 sm:pb-14">
           <p className="text-sm font-medium tracking-wide text-white/80 uppercase">
             Rooms for rent across Bhutan
@@ -79,7 +92,7 @@ export function Browse() {
         </div>
       </section>
 
-      <div className="relative z-10 mx-auto -mt-8 w-[93%] rounded-3xl bg-background p-3 shadow-lg ring-1 ring-black/5">
+      <div className="relative z-10 mx-auto -mt-8 hidden w-[93%] rounded-3xl bg-background p-3 shadow-lg ring-1 ring-black/5 md:block">
         <Filters />
       </div>
 
@@ -99,22 +112,33 @@ export function Browse() {
             ))}
           </div>
         ) : rooms.length === 0 ? (
-          <div className="py-16 text-center">
-            <p className="font-medium">No rooms match your filters</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Try adjusting or clearing your search.
-            </p>
-            {searchParams.size > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4 rounded-full"
-                onClick={() => router.replace("/", { scroll: false })}
-              >
-                Clear filters
-              </Button>
-            )}
-          </div>
+          <>
+            <div className="flex flex-wrap items-center justify-end gap-2 pb-4">
+              {/* Desktop keeps the top-level Save-this-search; mobile shows the Filter button (which itself contains Save inside the sheet) */}
+              <span className="hidden md:block">
+                <SaveSearchButton filters={filters} />
+              </span>
+              <span className="md:hidden">
+                <MobileFilterSheet />
+              </span>
+            </div>
+            <div className="py-16 text-center">
+              <p className="font-medium">No rooms match your filters</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Try adjusting or clearing your search.
+              </p>
+              {searchParams.size > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4 rounded-full"
+                  onClick={() => router.replace("/", { scroll: false })}
+                >
+                  Clear filters
+                </Button>
+              )}
+            </div>
+          </>
         ) : (
           <>
             <div className="flex flex-wrap items-center justify-between gap-2 pb-4">
@@ -122,9 +146,28 @@ export function Browse() {
                 {total} {total === 1 ? "room" : "rooms"} available
                 {totalPages > 1 && ` · page ${page} of ${totalPages}`}
               </p>
-              <SaveSearchButton filters={filters} />
+              {/* Desktop keeps the top-level Save-this-search; mobile shows the Filter button (which itself contains Save inside the sheet) */}
+              <span className="hidden md:block">
+                <SaveSearchButton filters={filters} />
+              </span>
+              <span className="md:hidden">
+                <MobileFilterSheet />
+              </span>
             </div>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {/* Mobile: single-column horizontal cards */}
+            <div className="flex flex-col gap-3 md:hidden">
+              {rooms.map((room, i) => (
+                <MobileRoomCard
+                  key={room.id}
+                  room={room}
+                  priority={i < 3}
+                  saved={savedIds.has(room.id)}
+                  onToggleSave={() => toggleSaved(room.id)}
+                />
+              ))}
+            </div>
+            {/* Desktop (md and up): unchanged grid of vertical cards */}
+            <div className="hidden grid-cols-1 gap-6 sm:grid-cols-2 md:grid lg:grid-cols-3">
               {rooms.map((room, i) => (
                 <RoomCard
                   key={room.id}
@@ -140,5 +183,7 @@ export function Browse() {
         )}
       </section>
     </div>
+    <Toaster />
+    </ToastProvider>
   );
 }

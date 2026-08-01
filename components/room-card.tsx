@@ -5,6 +5,7 @@ import { Image02Icon } from "@hugeicons/core-free-icons";
 import { Card, CardContent } from "@/components/ui/card";
 import { SaveButton } from "@/components/save-button";
 import { roomTypeLabel } from "@/lib/districts";
+import { timeAgo } from "@/lib/time";
 import type { Room } from "@/lib/types";
 
 export function RoomCard({
@@ -70,6 +71,11 @@ export function RoomCard({
             Nu. {room.price.toLocaleString("en-IN")}{" "}
             <span className="font-normal text-muted-foreground">/ month</span>
           </p>
+          {!unavailable && (
+            <p className="pt-0.5 text-xs text-muted-foreground">
+              Posted {timeAgo(room.created_at)}
+            </p>
+          )}
         </CardContent>
       </Card>
     </Link>
