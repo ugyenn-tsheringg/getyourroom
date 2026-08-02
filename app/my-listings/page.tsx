@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Image02Icon } from "@hugeicons/core-free-icons";
+import { MobileRoomCard } from "@/components/mobile-room-card";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -86,33 +87,12 @@ export default function MyListingsPage() {
           </div>
         ) : (
           rooms.map((room) => (
-            <div
-              key={room.id}
-              className="flex flex-col gap-4 rounded-3xl p-4 ring-1 ring-foreground/8 sm:flex-row sm:items-center"
-            >
-              <Link
-                href={`/rooms/${room.id}`}
-                className="relative aspect-[4/3] w-full shrink-0 overflow-hidden rounded-2xl bg-muted sm:w-36"
-              >
-                {room.images[0] ? (
-                  <Image src={room.images[0]} alt="" fill sizes="144px" className="object-cover" />
-                ) : (
-                  <div className="flex h-full items-center justify-center">
-                    <HugeiconsIcon icon={Image02Icon} className="size-6 text-muted-foreground/40" />
-                  </div>
-                )}
-              </Link>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <Link href={`/rooms/${room.id}`} className="truncate font-medium hover:underline">
-                    {roomTypeLabel(room.room_type)} in {room.place}
-                  </Link>
+            <div key={room.id}>
+              {/* Mobile (below md): shared horizontal card + vendor actions below it */}
+              <div className="md:hidden">
+                <MobileRoomCard room={room} unavailable={isRoomUnavailable(room)} />
+                <div className="mt-2 flex flex-wrap items-center gap-2">
                   {statusBadge(room)}
-                </div>
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  {room.district} · Nu. {room.price.toLocaleString("en-IN")} / month
-                </p>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
                   <Button variant="outline" size="sm" className="rounded-full" onClick={() => toggleStatus(room)}>
                     {room.status === "available" ? "Mark as rented" : "Mark as available"}
                   </Button>
@@ -130,6 +110,52 @@ export default function MyListingsPage() {
                   >
                     Delete
                   </Button>
+                </div>
+              </div>
+
+              {/* Desktop (md and up): unchanged card */}
+              <div className="hidden gap-4 rounded-3xl p-4 ring-1 ring-foreground/8 md:flex md:items-center">
+                <Link
+                  href={`/rooms/${room.id}`}
+                  className="relative aspect-[4/3] w-full shrink-0 overflow-hidden rounded-2xl bg-muted sm:w-36"
+                >
+                  {room.images[0] ? (
+                    <Image src={room.images[0]} alt="" fill sizes="144px" className="object-cover" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center">
+                      <HugeiconsIcon icon={Image02Icon} className="size-6 text-muted-foreground/40" />
+                    </div>
+                  )}
+                </Link>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <Link href={`/rooms/${room.id}`} className="truncate font-medium hover:underline">
+                      {roomTypeLabel(room.room_type)} in {room.place}
+                    </Link>
+                    {statusBadge(room)}
+                  </div>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {room.district} · Nu. {room.price.toLocaleString("en-IN")} / month
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Button variant="outline" size="sm" className="rounded-full" onClick={() => toggleStatus(room)}>
+                      {room.status === "available" ? "Mark as rented" : "Mark as available"}
+                    </Button>
+                    <Link
+                      href={`/rooms/${room.id}/edit`}
+                      className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-full")}
+                    >
+                      Edit
+                    </Link>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => setDeleting(room)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>

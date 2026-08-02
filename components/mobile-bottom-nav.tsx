@@ -101,7 +101,7 @@ export function MobileBottomNav() {
 
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background/90 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0.5rem))] backdrop-blur-md md:hidden">
         <div className="mx-auto flex h-16 max-w-md items-stretch justify-around px-1">
           <TabButton icon={Home09Icon} label="Home" active={active("/")} onClick={() => go("/", false)} />
           <TabButton
