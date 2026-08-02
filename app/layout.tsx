@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Figtree } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { SiteHeader } from "@/components/site-header";
+import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 
 const figtree = Figtree({subsets:['latin'],variable:'--font-sans'});
 
@@ -49,7 +50,7 @@ export default function RootLayout({
       lang="en"
       className={cn("h-full", "antialiased", geistSans.variable, geistMono.variable, "font-sans", figtree.variable)}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col pb-[calc(5rem+env(safe-area-inset-bottom,0.5rem))] md:pb-0">
         <SiteHeader />
         <main className="flex-1">{children}</main>
         <footer className="border-t border-border/60">
@@ -71,6 +72,7 @@ export default function RootLayout({
             </div>
           </div>
         </footer>
+        <MobileBottomNav />
       </body>
     </html>
   );
