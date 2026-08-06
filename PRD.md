@@ -120,6 +120,11 @@ Route: `/get-app`. Instructions for "Add to Home Screen" on iOS/Android. The sit
 
 **Site footer** carries three items: a copyright line ("© 2026 GetYourRoom. All rights reserved."), a "Want the app? Click here!" link to `/get-app`, and a "Have feedback? Click here!" link to `/feedback`.
 
+### 11. Mobile bottom navigation — **State: done** _(new)_
+Mobile only (below the `md` breakpoint); desktop is unchanged (on mobile the top header is simplified to logo-only). A fixed, native-app-style bottom tab bar with: **Home** (`/`), **Listings** (`/my-listings`), **Post** (`/post`, emphasized as a raised filled tile), **Saved** (`/saved`), and **Account** (opens a sheet showing the signed-in email + Sign out), plus an **admin-only Dashboard** tab (`/admin`) shown only to the operator.
+- Signed-out behavior: Home is freely browsable; tapping any other tab redirects to sign-in (`/login?next=…`).
+- Active-tab highlighting with subtle iOS-style animations (respects `prefers-reduced-motion`), and padding that respects device safe areas (e.g. the iPhone home indicator) so the bar isn't flush to the physical screen edge.
+
 ## Out of scope (for now)
 - ~~Login/accounts for vendors or renters~~ — **now built** for vendors (email OTP; required to post) and optional for renters (saving). Renters can still browse fully without an account.
 - Payments or subscriptions — **still out of scope.**
